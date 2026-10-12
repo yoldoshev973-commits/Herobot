@@ -712,10 +712,11 @@
         document.getElementById('accountList').innerHTML = data.users.length ? data.users.map(u => {
           const isAct = !!u.active;
           return `<div class="acc-item ${isAct?'active-acc':'error-acc'}">
-            <div class="acc-top"><span class="acc-email">${esc(u.email)}${u.full_name ? `<div class="who">👤 ${esc(u.full_name)}${u.student_id ? ` · ID ${esc(u.student_id)}` : ''}</div>` : `<div class="who" style="color:var(--ink-lt)">Ro'yxatda topilmadi</div>`}</span><span class="badge ${isAct?'badge-green':'badge-red'}">${isAct?'Aktiv':'Nofaol'}</span></div>
+            <div class="acc-top"><span class="acc-email">${esc(u.email)}${u.full_name ? `<div class="who">👤 ${esc(u.full_name)}${u.student_id ? ` · ID ${esc(u.student_id)}` : ''}</div>` : `<div class="who" style="color:var(--ink-lt)">Ro'yxatda topilmadi</div>`}</span><span class="badge ${isAct?'badge-green':'badge-red'}">${u.primary?'⭐ Asosiy · ':''}${isAct?'Aktiv':'Nofaol'}</span></div>
             <div class="acc-bottom"><span style="font-size:12px;color:var(--ink-lt)">${isAct?'Parol shifrlangan':'Yangilash tugmasini bosing'}</span>
               <div class="action-group">
                 ${!isAct ? `<button class="act-btn reload" onclick="reloadToken(${u.id})">🔄</button>` : ''}
+                <button class="act-btn" title="${u.primary ? 'Asosiy akkaunt (bosilsa olib tashlanadi)' : 'Asosiy qilish: skaner va davomatda faqat shu ko\'rinadi'}" onclick="setPrimary(${u.id},${u.primary ? 'false' : 'true'})">${u.primary ? '⭐' : '☆'}</button>
                 <button class="act-btn" onclick="openEdit(${u.id},'${esc(escJs(u.email))}')">✏️</button>
                 <button class="act-btn del" onclick="delAcc(${u.id})">🗑</button>
               </div></div></div>`;
@@ -733,6 +734,14 @@
     const res = await (await fetch('/api/users/add', { method:'POST', headers: getHeaders(), body: JSON.stringify({email:e, password:p}) })).json();
     showNotify(res.message, res.status==='success');
     if (res.status==='success') { document.getElementById('newEmail').value=''; document.getElementById('newPass').value=''; loadData(); }
+  }
+
+  async function setPrimary(id, on) {
+    try {
+      const res = await (await fetch('/api/users/primary', { method:'POST', headers: getHeaders(), body: JSON.stringify({account_id: id, primary: on}) })).json();
+      showNotify(res.message || (res.status==='success' ? 'Saqlandi' : 'Xato'), res.status==='success');
+    } catch(e) { showNotify("Aloqa xatosi", false); }
+    loadData();
   }
 
   async function delAcc(id) {

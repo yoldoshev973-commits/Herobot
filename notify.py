@@ -123,7 +123,9 @@ async def owners_of(emails):
 
 async def user_emails(uid):
     async with db.pool.acquire() as conn:
-        rows = await conn.fetch("SELECT email, full_name FROM hero_accounts WHERE user_id=$1 ORDER BY id", int(uid))
+        rows = await conn.fetch("SELECT email, full_name, is_primary FROM hero_accounts WHERE user_id=$1 ORDER BY id", int(uid))
+    prim = [r for r in rows if r["is_primary"]]
+    if prim: rows = prim   # ASOSIY akkaunt belgilangan bo'lsa — davomat faqat o'shaniki
     return {r["email"]: (r["full_name"] or r["email"]) for r in rows}
 
 

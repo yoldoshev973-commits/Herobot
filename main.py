@@ -546,7 +546,7 @@ async def get_users_list(request):
     u_id, role = verify_token(request)
     if not u_id: return web.json_response({"status": "error"}, status=401)
     users = await db.get_hero_accounts(u_id)
-    return web.json_response({"status": "success", "role": role, "users": [{"id":u["id"], "email":u["email"], "active":_token_ok(u["bearer_token"]), "full_name":u["full_name"], "student_id":u["student_id"]} for u in users]}) # Parol yuborilmaydi!
+    return web.json_response({"status": "success", "role": role, "users": [{"id":u["id"], "email":u["email"], "active":_token_ok(u["bearer_token"]), "primary":bool(u["is_primary"]), "full_name":u["full_name"], "student_id":u["student_id"]} for u in users]}) # Parol yuborilmaydi!
 
 async def add_user(request):
     u_id, _ = verify_token(request)
@@ -601,6 +601,16 @@ async def reload_user_token(request):
         return web.json_response({"status": "success", "message": "Aktivlashtirildi!"})
     return web.json_response({"status": "error", "message": f"Xato: {result}"})
 
+async def set_primary_user(request):
+    """Foydalanuvchi bitta akkauntini ASOSIY qilib belgilaydi (primary=false — olib tashlaydi)."""
+    u_id, _ = verify_token(request)
+    if not u_id: return web.json_response({"status": "error"}, status=401)
+    try: data = await request.json(); acc_id = int(data.get("account_id"))
+    except (TypeError, ValueError, AttributeError): return web.json_response({"status": "error", "message": "Topilmadi"}, status=400)
+    on = data.get("primary") is not False
+    if not await db.set_primary_account(u_id, acc_id, on): return web.json_response({"status": "error", "message": "Topilmadi"})
+    return web.json_response({"status": "success", "message": "⭐ Asosiy akkaunt belgilandi" if on else "Asosiy akkaunt belgisi olib tashlandi"})
+
 async def delete_user(request):
     u_id, _ = verify_token(request)
     if not u_id: return web.json_response({"status": "error"}, status=401)
@@ -647,7 +657,8 @@ async def do_scan(request):
     # Nofaol akkauntlar skanerga qo'shilmagan — ular ham 'kirmadi' ro'yxatida chiqadi.
     by_email = {r['email']: r for r in report}
     user_report = []
-    for acc in user_accounts:
+    shown_accounts = [a for a in user_accounts if a.get('is_primary')] or list(user_accounts)   # ASOSIY akkaunt bo'lsa — faqat u ko'rsatiladi (qolganlari baribir skanerlanadi)
+    for acc in shown_accounts:
         r = by_email.get(acc['email'])
         st = students.lookup(acc['email']) or {}
         name = acc.get('full_name') or st.get('full_name')
@@ -659,7 +670,7 @@ async def do_scan(request):
         elif not ok and r.get("msg"): item["msg"] = r["msg"]; item["reason"] = r.get("reason")
         user_report.append(item)
     user_success = sum(1 for r in user_report if r['ok'])
-    user_total = sum(1 for a in user_accounts if _token_ok(a.get('bearer_token')))   # 'jami' faqat foydalanuvchining o'z faol akkauntlari
+    user_total = sum(1 for a in shown_accounts if _token_ok(a.get('bearer_token')))   # 'jami' faqat foydalanuvchining o'z faol akkauntlari
 
     await db.save_detailed_scan(u_id, user_success, user_total, duration, user_report, lesson)
     jid, joke = (await jokes.next_joke_item()) if user_success > 0 else (None, None)
@@ -730,6 +741,7 @@ async def broadcast_to_lesson(scanned_emails, ok_emails, qr_url, scanner_uid):
             items = []
             for a in owner_accs:
                 if a["email"] not in res: continue
+                if a.get("has_primary") and not a.get("is_primary"): continue   # asosiy akkaunti bor — faqat o'shani ko'rsatamiz
                 st = students.lookup(a["email"]) or {}
                 name, sid = a.get("full_name") or st.get("full_name"), a.get("student_id") or st.get("student_id")
                 items.append({"email": a["email"], "ok": bool(res[a["email"]]), "name": name, "student_id": sid, "label": person_label(name, sid, a["email"])})
@@ -747,11 +759,6 @@ async def broadcast_to_lesson(scanned_emails, ok_emails, qr_url, scanner_uid):
                                                 f"{_fmt_people(passed)}\n\n😄 {jtext}\n\n🕒 {tashkent_now():%d.%m.%Y %H:%M:%S} {i18n.t(lg, 'tz')}")[:4000],
                                            reply_markup=jokes.vote_kb(jid))
                 except Exception as e: logger.warning(f"Avto-yuborish xabari yuborilmadi: {e}")
-        if bot:
-            try:
-                tg = await db.get_telegram_id(scanner_uid)
-                if tg: await bot.send_message(tg, f"👥 Shu darsdagi ({title}) boshqa {len(res)} ta akkauntga ham yuborildi: {sum(1 for v in res.values() if v)} tasi kirdi.")
-            except Exception as e: logger.warning(f"Skanerchiga xabar yuborilmadi: {e}")
         logger.info(f"🔁 Dars bo'yicha avto-yuborish ({title}): {sum(1 for v in res.values() if v)}/{len(res)} kirdi")
     except Exception as e:
         logger.error(f"Dars bo'yicha avto-yuborish xatosi: {e}")
@@ -1602,7 +1609,7 @@ async def main():
     app.router.add_get("/health", lambda r: web.Response(text="OK"))
     app.router.add_post("/api/auth/login", auth_login); app.router.add_get("/api/users", get_users_list)
     app.router.add_post("/api/users/add", add_user); app.router.add_post("/api/users/delete", delete_user)
-    app.router.add_post("/api/users/edit", edit_user); app.router.add_post("/api/users/reload", reload_user_token) 
+    app.router.add_post("/api/users/edit", edit_user); app.router.add_post("/api/users/reload", reload_user_token); app.router.add_post("/api/users/primary", set_primary_user) 
     app.router.add_get("/api/stats", get_stats); app.router.add_post("/api/scan", do_scan)
     app.router.add_post("/api/feedback", submit_feedback)
     

@@ -113,6 +113,8 @@ async def init_db():
                 CREATE INDEX IF NOT EXISTS scan_logs_scanned_idx ON scan_logs (scanned_at);
                 CREATE INDEX IF NOT EXISTS scan_logs_user_idx ON scan_logs (user_id, scanned_at);
                 CREATE INDEX IF NOT EXISTS hero_accounts_email_idx ON hero_accounts (email);
+                ALTER TABLE hero_accounts ADD COLUMN IF NOT EXISTS is_primary BOOLEAN NOT NULL DEFAULT FALSE;
+                CREATE UNIQUE INDEX IF NOT EXISTS hero_accounts_primary_uniq ON hero_accounts (user_id) WHERE is_primary;
             """)
         logger.info("✅ Database tayyor.")
     except Exception as e:
@@ -308,7 +310,16 @@ async def save_detailed_scan(user_id, success, total, duration, details, lesson=
 
 async def get_hero_accounts(user_id):
     async with pool.acquire() as conn:
-        return await conn.fetch("SELECT id, email, hero_password, bearer_token, student_id, full_name FROM hero_accounts WHERE user_id=$1 ORDER BY id DESC", int(user_id))
+        return await conn.fetch("SELECT id, email, hero_password, bearer_token, student_id, full_name, is_primary FROM hero_accounts WHERE user_id=$1 ORDER BY is_primary DESC, id DESC", int(user_id))
+
+async def set_primary_account(user_id, account_id, on=True):
+    """Foydalanuvchining ASOSIY akkauntini belgilaydi (bittadan ortiq bo'lmaydi) yoki olib tashlaydi. Boshqa odamning akkauntiga tegmaydi."""
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            if not await conn.fetchval("SELECT 1 FROM hero_accounts WHERE id=$1 AND user_id=$2", int(account_id), int(user_id)): return False
+            await conn.execute("UPDATE hero_accounts SET is_primary=FALSE WHERE user_id=$1 AND is_primary", int(user_id))
+            if on: await conn.execute("UPDATE hero_accounts SET is_primary=TRUE WHERE id=$1 AND user_id=$2", int(account_id), int(user_id))
+    return True
 
 async def get_active_tokens(user_id):
     async with pool.acquire() as conn:
@@ -760,7 +771,8 @@ async def get_accounts_by_emails(emails, owner_tg_id=0):
     if not emails: return []
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            "SELECT a.id, a.user_id, a.email, a.hero_password, a.bearer_token, a.student_id, a.full_name, u.telegram_id "
+            "SELECT a.id, a.user_id, a.email, a.hero_password, a.bearer_token, a.student_id, a.full_name, a.is_primary, u.telegram_id, "
+            "EXISTS(SELECT 1 FROM hero_accounts p WHERE p.user_id = a.user_id AND p.is_primary) AS has_primary "
             "FROM hero_accounts a JOIN app_users u ON u.id = a.user_id "
             "WHERE a.email = ANY($1::text[]) AND u.is_blocked = FALSE "
             "AND (u.is_admin = TRUE OR u.telegram_id = $2 OR u.trial_ends_at > NOW()) ORDER BY a.id DESC",
