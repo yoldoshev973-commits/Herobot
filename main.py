@@ -651,7 +651,7 @@ async def do_scan(request):
     lesson = lesson or _qr_lesson.get(qr_url) or _lesson_from_url(qr_url)   # tarixda "—" chiqmasin
     if total == 0: return web.json_response({"status": "error", "message": "Akkauntlaringiz NOFAOL!"})
     ok_emails = {r['email'] for r in report if r['ok']}
-    if ok_emails: _bg(broadcast_to_lesson({a['email'] for a in all_accounts}, ok_emails, qr_url, u_id))   # fonda: javobni kutdirmaydi
+    if ok_emails: _bg(_after_scan({a['email'] for a in all_accounts}, ok_emails, qr_url, u_id, lesson))   # fonda: javobni kutdirmaydi
         
     # Foydalanuvchining O'Z akkauntlari bo'yicha hisobot (sharpa akkauntlar ko'rsatilmaydi): ism + ID bilan.
     # Nofaol akkauntlar skanerga qo'shilmagan — ular ham 'kirmadi' ro'yxatida chiqadi.
@@ -671,12 +671,19 @@ async def do_scan(request):
         user_report.append(item)
     user_success = sum(1 for r in user_report if r['ok'])
     user_total = sum(1 for a in shown_accounts if _token_ok(a.get('bearer_token')))   # 'jami' faqat foydalanuvchining o'z faol akkauntlari
+    if user_success > 0:
+        # Kimdir darsga kirgan bo'lsa — dars haqiqiy. Jadvalida bu dars bo'lmagan akkauntlar ('not_in_lesson') kirmay qolgani XATO emas:
+        # ular hisobotdan va 'jami'dan chiqariladi (4 tasi kirsa — 4/4, 2 tasida bu dars yo'q).
+        skipped = [r for r in user_report if not r['ok'] and r.get('reason') == 'not_in_lesson']
+        if skipped:
+            user_report = [r for r in user_report if r not in skipped]
+            user_total = max(user_success, user_total - len(skipped))
 
     await db.save_detailed_scan(u_id, user_success, user_total, duration, user_report, lesson)
     jid, joke = (await jokes.next_joke_item()) if user_success > 0 else (None, None)
     tg_id = await db.get_telegram_id(u_id)
     lg = await notify.lang_of(tg_id) if tg_id else "uz"
-    why = _why_lines(user_report, lg)
+    why = _why_lines(user_report, lg) + ([i18n.t(lg, 'why_not_in', n=len(skipped))] if user_success > 0 and skipped else [])
     if bot and tg_id:
         try:
             passed = [r for r in user_report if r['ok']]
@@ -706,14 +713,14 @@ async def lesson_broadcast_enabled():
 async def broadcast_to_lesson(scanned_emails, ok_emails, qr_url, scanner_uid):
     """scanned_emails — allaqachon skanerlangan (qayta urinilmaydi); ok_emails — kirgani. Xatolar skaner javobiga ta'sir qilmaydi."""
     try:
-        if not await lesson_broadcast_enabled(): return
+        if not await lesson_broadcast_enabled(): return set()
         rows = await db.get_all_schedules()
         groups = await asyncio.to_thread(hero_schedule.group_lessons, rows)
         now_ts = time.time()
         for kk in [kk for kk, t in _lesson_marked.items() if now_ts - t > 4 * 3600]: _lesson_marked.pop(kk, None)
         ok_set = set(ok_emails)
         keys = [k for k, g in groups.items() if g["emails"] & ok_set and hero_schedule.is_active_now(g)]
-        if not keys: return
+        if not keys: return set()
         for k in keys:
             for e in groups[k]["emails"] & ok_set: _lesson_marked[(k, e)] = now_ts
         target = {}   # email -> dars kaliti
@@ -721,47 +728,107 @@ async def broadcast_to_lesson(scanned_emails, ok_emails, qr_url, scanner_uid):
             for e in groups[k]["emails"]:
                 if e in scanned_emails or (k, e) in _lesson_marked: continue
                 target[e] = k; _lesson_marked[(k, e)] = now_ts   # oldindan band qilamiz
-        if not target: return
-        accs = await db.get_accounts_by_emails(target.keys(), ADMIN_ID)
-        by_email = {}
-        for a in accs:   # bir email bir necha foydalanuvchida bo'lsa — tokeni borini tanlaymiz
-            cur = by_email.get(a["email"])
-            if cur is None or (not _token_ok(cur.get("bearer_token")) and _token_ok(a.get("bearer_token"))): by_email[a["email"]] = a
-        for e, k in list(target.items()):
-            if e not in by_email: _lesson_marked.pop((k, e), None)
-        success, total, duration, report, _ = await mark_all_accounts_smart(list(by_email.values()), qr_url, _update_token_db)
-        res = {r["email"]: r["ok"] for r in report if r["email"] in by_email}
+        if not target: return set()
+        res = await _scan_extra(target.keys(), qr_url, (groups[keys[0]].get("title") or "Dars"), "avto",
+                                on_missing=lambda e: _lesson_marked.pop((target[e], e), None))
         for e, k in target.items():
             if not res.get(e): _lesson_marked.pop((k, e), None)   # kirmaganlarni keyingi skaner qayta urinib ko'ra oladi
-        if not res: return
-        g0 = groups[keys[0]]; title = g0.get("title") or "Dars"
-        by_owner = {}
-        for a in accs: by_owner.setdefault(a["user_id"], []).append(a)
-        for uid, owner_accs in by_owner.items():
-            items = []
-            for a in owner_accs:
-                if a["email"] not in res: continue
-                if a.get("has_primary") and not a.get("is_primary"): continue   # asosiy akkaunti bor — faqat o'shani ko'rsatamiz
-                st = students.lookup(a["email"]) or {}
-                name, sid = a.get("full_name") or st.get("full_name"), a.get("student_id") or st.get("student_id")
-                items.append({"email": a["email"], "ok": bool(res[a["email"]]), "name": name, "student_id": sid, "label": person_label(name, sid, a["email"])})
-            if not items: continue
-            n_ok = sum(1 for i in items if i["ok"])
-            try: await db.save_detailed_scan(uid, n_ok, len(items), duration, items, f"{title} · avto"[:160])
-            except Exception as e: logger.warning(f"Avto-yuborish logi yozilmadi: {e}")
-            if bot and n_ok:
-                try:
-                    tg = owner_accs[0].get("telegram_id")
-                    passed = [i for i in items if i["ok"]]
-                    lg = await notify.lang_of(tg)
-                    jid, jtext = await jokes.next_joke_item()
-                    await bot.send_message(tg, (f"{i18n.t(lg, 'auto_in')}\n{i18n.t(lg, 'lesson', t=title)}\n\n"
-                                                f"{_fmt_people(passed)}\n\n😄 {jtext}\n\n🕒 {tashkent_now():%d.%m.%Y %H:%M:%S} {i18n.t(lg, 'tz')}")[:4000],
-                                           reply_markup=jokes.vote_kb(jid))
-                except Exception as e: logger.warning(f"Avto-yuborish xabari yuborilmadi: {e}")
-        logger.info(f"🔁 Dars bo'yicha avto-yuborish ({title}): {sum(1 for v in res.values() if v)}/{len(res)} kirdi")
+        return set(target)
     except Exception as e:
         logger.error(f"Dars bo'yicha avto-yuborish xatosi: {e}")
+        return set()
+
+async def _scan_extra(emails, qr_url, title, tag, on_missing=None):
+    """Berilgan emaillarni shu QR bilan skanerlaydi, har bir egasiga log yozadi va (kirgan bo'lsa) xabar yuboradi.
+    Qaytaradi: {email: kirdimi}. Dars bo'yicha avto-yuborish ham, 'hamroh' akkauntlar ham shu orqali ishlaydi."""
+    emails = list(emails)
+    accs = await db.get_accounts_by_emails(emails, ADMIN_ID)
+    by_email = {}
+    for a in accs:   # bir email bir necha foydalanuvchida bo'lsa — tokeni borini tanlaymiz
+        cur = by_email.get(a["email"])
+        if cur is None or (not _token_ok(cur.get("bearer_token")) and _token_ok(a.get("bearer_token"))): by_email[a["email"]] = a
+    if on_missing:
+        for e in emails:
+            if e not in by_email: on_missing(e)
+    success, total, duration, report, _ = await mark_all_accounts_smart(list(by_email.values()), qr_url, _update_token_db)
+    res = {r["email"]: r["ok"] for r in report if r["email"] in by_email}
+    if not res: return {}
+    by_owner = {}
+    for a in accs: by_owner.setdefault(a["user_id"], []).append(a)
+    for uid, owner_accs in by_owner.items():
+        items = []
+        for a in owner_accs:
+            if a["email"] not in res: continue
+            if a.get("has_primary") and not a.get("is_primary"): continue   # asosiy akkaunti bor — faqat o'shani ko'rsatamiz
+            st = students.lookup(a["email"]) or {}
+            name, sid = a.get("full_name") or st.get("full_name"), a.get("student_id") or st.get("student_id")
+            items.append({"email": a["email"], "ok": bool(res[a["email"]]), "name": name, "student_id": sid, "label": person_label(name, sid, a["email"])})
+        if not items: continue
+        n_ok = sum(1 for i in items if i["ok"])
+        try: await db.save_detailed_scan(uid, n_ok, len(items), duration, items, f"{title} · {tag}"[:160])
+        except Exception as e: logger.warning(f"Qo'shimcha skaner logi yozilmadi: {e}")
+        if bot and n_ok:
+            try:
+                tg = owner_accs[0].get("telegram_id")
+                passed = [i for i in items if i["ok"]]
+                lg = await notify.lang_of(tg)
+                jid, jtext = await jokes.next_joke_item()
+                await bot.send_message(tg, (f"{i18n.t(lg, 'auto_in')}\n{i18n.t(lg, 'lesson', t=title)}\n\n"
+                                            f"{_fmt_people(passed)}\n\n😄 {jtext}\n\n🕒 {tashkent_now():%d.%m.%Y %H:%M:%S} {i18n.t(lg, 'tz')}")[:4000],
+                                       reply_markup=jokes.vote_kb(jid))
+            except Exception as e: logger.warning(f"Qo'shimcha skaner xabari yuborilmadi: {e}")
+    logger.info(f"🔁 {tag} ({title}): {sum(1 for v in res.values() if v)}/{len(res)} kirdi")
+    return res
+
+# --- HAMROH AKKAUNTLAR ---
+# Admin tanlagan akkauntlar (admin panelda 🤝 Hamrohlar): kim skaner qilib, kimdir darsga KIRSA — ular ham o'sha QR bilan avtomatik skanerlanadi.
+# Dars jadvaliga bog'liq emas va "Avto-yuborish" tugmasidan mustaqil.
+COMPANION_KEY = "companion_emails"
+_comp_marked = {}   # (qr_url, email) -> vaqt: bir QR ikki marta yuborilmasin
+
+async def get_companions():
+    try: v = json.loads(await db.get_setting(COMPANION_KEY) or "[]")
+    except Exception: v = []
+    return [e for e in v if isinstance(e, str)] if isinstance(v, list) else []
+
+async def scan_companions(skip_emails, qr_url, title):
+    try:
+        comp = await get_companions()
+        now_ts = time.time()
+        for kk in [kk for kk, t in _comp_marked.items() if now_ts - t > 1800]: _comp_marked.pop(kk, None)
+        todo = [e for e in comp if e not in skip_emails and (qr_url, e) not in _comp_marked]
+        if not todo: return
+        for e in todo: _comp_marked[(qr_url, e)] = now_ts
+        res = await _scan_extra(todo, qr_url, title or "Dars", "hamroh", on_missing=lambda e: _comp_marked.pop((qr_url, e), None))
+        for e in todo:
+            if not res.get(e): _comp_marked.pop((qr_url, e), None)
+    except Exception as e:
+        logger.error(f"Hamroh akkauntlarni skanerlash xatosi: {e}")
+
+async def _after_scan(scanned_emails, ok_emails, qr_url, scanner_uid, title):
+    attempted = await broadcast_to_lesson(scanned_emails, ok_emails, qr_url, scanner_uid) or set()
+    await scan_companions(set(scanned_emails) | attempted, qr_url, title)
+
+async def admin_companions(request):
+    """Admin: hamroh akkauntlar ro'yxati + tanlash uchun barcha akkauntlar."""
+    u_id, role = verify_token(request)
+    if not u_id or role != "super_admin": return web.json_response({"status": "error", "message": "Ruxsat yo'q"}, status=403)
+    chosen = set(await get_companions())
+    accs = sorted(await db.get_schedule_overview(), key=lambda r: ((r.get("full_name") or r["email"]).lower()))
+    return web.json_response({"status": "success", "accounts": [
+        {"email": r["email"], "name": r.get("full_name"), "student_id": r.get("student_id"), "active": bool(r.get("active")), "chosen": r["email"] in chosen} for r in accs]})
+
+async def admin_companions_save(request):
+    u_id, role = verify_token(request)
+    if not u_id or role != "super_admin": return web.json_response({"status": "error", "message": "Ruxsat yo'q"}, status=403)
+    try: emails = (await request.json()).get("emails")
+    except Exception: emails = None
+    if not isinstance(emails, list): return web.json_response({"status": "error", "message": "Noto'g'ri so'rov"}, status=400)
+    known = {r["email"] for r in await db.get_schedule_overview()}
+    clean = sorted({str(e).strip().lower() for e in emails} & {k.lower() for k in known})
+    keep = [k for k in known if k.lower() in set(clean)]
+    await db.set_setting(COMPANION_KEY, json.dumps(sorted(keep)))
+    return web.json_response({"status": "success", "count": len(keep), "message": f"✅ {len(keep)} ta hamroh akkaunt saqlandi" if keep else "Hamroh akkauntlar ro'yxati bo'sh (o'chirilgan)"})
 
 # Feedback marshruti
 async def submit_feedback(request):
@@ -1619,7 +1686,7 @@ async def main():
     app.router.add_get("/api/admin/jokes", admin_jokes); app.router.add_post("/api/admin/jokes_import", admin_jokes_import); app.router.add_post("/api/admin/jokes_update", admin_jokes_update); app.router.add_post("/api/admin/jokes_delete", admin_jokes_delete); app.router.add_post("/api/admin/jokes_send", admin_jokes_send)
     extras.register(app, {"verify_token": verify_token, "verify_hero_account": verify_hero_account, "spawn_schedule": _spawn_schedule, "bot": bot})
     app.router.add_get("/api/admin/report", admin_report); app.router.add_post("/api/admin/report_send", admin_report_send)
-    app.router.add_get("/api/admin/lessons", admin_lessons); app.router.add_post("/api/admin/lessons_toggle", admin_lessons_toggle); app.router.add_get("/api/admin/schedules", admin_schedules); app.router.add_get("/api/admin/schedule", admin_schedule_detail); app.router.add_post("/api/admin/schedule_refresh", admin_schedule_refresh)
+    app.router.add_get("/api/admin/companions", admin_companions); app.router.add_post("/api/admin/companions", admin_companions_save); app.router.add_get("/api/admin/lessons", admin_lessons); app.router.add_post("/api/admin/lessons_toggle", admin_lessons_toggle); app.router.add_get("/api/admin/schedules", admin_schedules); app.router.add_get("/api/admin/schedule", admin_schedule_detail); app.router.add_post("/api/admin/schedule_refresh", admin_schedule_refresh)
 
     app.router.add_post("/api/share/generate", share_generate); app.router.add_post("/api/share/import", share_import)
     app.router.add_get("/api/share/connections", share_connections)
