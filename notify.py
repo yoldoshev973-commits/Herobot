@@ -102,7 +102,7 @@ async def ensure_lang(tg_id, language_code):
         logger.warning(f"Til o'rnatilmadi: {e}")
 
 
-async def owners_of(emails):
+async def owners_of(emails, primary_only=False):
     """{user_id: {"tg", "lang", "prefs", "emails": {email: ism}}} — shu akkauntlar egalari (bloklanmaganlar)."""
     emails = list(set(emails))
     if not emails:
@@ -110,11 +110,14 @@ async def owners_of(emails):
     async with db.pool.acquire() as conn:
         rows = await conn.fetch(
             "SELECT a.user_id, a.email, a.full_name, u.telegram_id, COALESCE(p.lang,'uz') AS lang, COALESCE(p.remind,TRUE) AS remind, "
-            "COALESCE(p.weekly,TRUE) AS weekly, COALESCE(p.grades,TRUE) AS grades "
+            "COALESCE(p.weekly,TRUE) AS weekly, COALESCE(p.grades,TRUE) AS grades, a.is_primary, "
+            "EXISTS(SELECT 1 FROM hero_accounts x WHERE x.user_id = a.user_id AND x.is_primary) AS has_primary "
             "FROM hero_accounts a JOIN app_users u ON u.id = a.user_id LEFT JOIN user_prefs p ON p.user_id = u.id "
             "WHERE a.email = ANY($1::text[]) AND u.telegram_id IS NOT NULL AND COALESCE(u.is_blocked, FALSE) = FALSE", emails)
     out = {}
     for r in rows:
+        if primary_only and r["has_primary"] and not r["is_primary"]:
+            continue   # ASOSIY akkaunti bor — eslatma faqat shu akkaunt darsida bo'lsa keladi
         o = out.setdefault(r["user_id"], {"tg": r["telegram_id"], "lang": r["lang"], "emails": {},
                                          "prefs": {k: r[k] for k in PREF_KEYS}})
         o["emails"][r["email"]] = r["full_name"] or r["email"]
@@ -195,7 +198,7 @@ async def reminder_tick():
     if not due:
         return
     auto = (await db.get_setting("lesson_broadcast")) != "0"
-    owners = await owners_of(set().union(*[g["emails"] for g, _ in due]))
+    owners = await owners_of(set().union(*[g["emails"] for g, _ in due]), primary_only=True)
     for g, mins in due:
         for uid, o in owners.items():
             if not o["prefs"]["remind"] or not (set(o["emails"]) & g["emails"]):
