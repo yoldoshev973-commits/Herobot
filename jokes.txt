@@ -1,0 +1,123 @@
+# Hazillar ro'yxati — har qatorda bitta hazil. "#" bilan boshlangan qatorlar va bo'sh qatorlar o'tkazib yuboriladi.
+# Yangi hazil qo'shish uchun shunchaki yangi qator yozing (Telegram xabarida odatiy matn sifatida chiqadi). Bot qayta ishga tushganda o'qiladi.
+
+# ---------- Talabalar va darslar ----------
+Domla: Nega kechikdingiz? Talaba: Alarm vaqtida jiringladi, men vaqtga ishonmadim.
+Talaba darsga o'z vaqtida keldi. Domla ham hayron, devor soati ham hayron, hatto QR ham hayron.
+Davomat qilish — bu sport: eng qiyin joyi o'rindiqdan turish emas, telefonni topish.
+Domla: Savol bormi? Auditoriya: (jimlik, 40 ta uyqusirayotgan nigoh)
+Imtihon oldidan "bir soatga yotaman" degan odam ertalab soat 7 da turadi. Imtihon 9 da edi, albatta.
+Talabaning 3 ta rejasi bor: A reja — o'qish, B reja — nusxa, C reja — "domla, keyingi safar topshirsam bo'ladimi?"
+Eng tez ishlaydigan narsa: dars tugagach talabalarning eshikka yetib borishi.
+Domla: Bugun yengil mavzu. Talabalar: (mavzu: kvant fizikasi)
+"Men bu fanni tushundim" — ertalab soat 3 da aytilgan eng katta yolg'on.
+Talaba: Domla, uy vazifasini it yeb qo'ydi. Domla: Sizda it bormi? Talaba: Yo'q, shuning uchun juda och edi.
+Konspekt — talabaning xazinasi. Faqat uni imtihondan bir kecha oldin ochishadi.
+Dars boshlandi, internet o'chdi, hamma birdan "men aslida tayyor edim" dedi.
+Stipendiya kelganda hamma do'st bo'ladi, o'n kundan keyin hamma yana "qarz" so'zini eshitmagandek bo'ladi.
+Talaba o'z-o'ziga: "Hali 3 hafta bor" — 3 hafta o'tgach: "Hali 3 kun bor" — 3 kun o'tgach: "Hali 3 soat bor".
+Eng chiroyli ko'rinish: oxirgi qatordagi talabaning "men diqqat bilan tinglayapman" yuzi.
+Domlaning eng sevimli savoli: "Kim javob beradi?" — Eng sevimli javob: jimlik.
+Auditoriyada 3 xil odam bor: o'qiydiganlar, o'qiyman deganlar va "mening ismim ro'yxatda bormi?" deganlar.
+Fan nomi "Oson matematika" — nomi bilan o'zi o'rtasida hech qanday aloqa yo'q.
+Imtihondan keyin hamma: "Menga oson bo'ldi." Natijalar chiqqach: sukunat.
+
+# ---------- QR, Wi-Fi, telefonlar ----------
+QR kod skaner qilindi! Endi navbat sizga — o'rindiqdan turib, darsga kirish.
+Telefon 1% — QR skaner qilish kerak. Bu — haqiqiy adrenalin.
+Wi-Fi: "Men bor edim." Talaba: "Men ham darsga bor edim." Ikkalamiz ham yo'qdek bo'ldik.
+QR kod: "Meni skaner qiling!" Talaba: "Avval kamerani toping."
+Darsga kirish uchun 3 narsa kerak: QR, internet va omad. Omadni bot bermaydi, QR'ni beradi.
+Bot: "Men hamma ishni qildim." Talabalar: "Biz ham... uxladik."
+Skaner qilindi — hammaga yetarli: biri skaner qiladi, hamma darsda.
+Telefonning zaryadi doim domla "telefonlarni yig'ing" degan paytda to'ladi.
+Internet sekinligi — dars boshlanishidan 1 daqiqa oldin boshlanadigan tabiiy hodisa.
+
+# ---------- Dasturchilar va texnologiya ----------
+Why do programmers prefer dark mode? Because light attracts bugs.
+There are 10 types of people: those who understand binary and those who don't.
+A SQL query walks into a bar, sees two tables and asks: "Can I join you?"
+It works on my machine! — Then we'll ship your machine.
+Debugging: being the detective in a crime movie where you are also the murderer.
+To understand recursion, you must first understand recursion.
+Dasturchi: "Bu xato emas, bu xususiyat (feature)."
+Kod ishladi. Nega ishlaganini bilmayman. Hech narsaga tegmang.
+Git commit -m "oxirgi versiya". Keyingi commit: "yana oxirgi versiya". Keyingisi: "haqiqatan oxirgi".
+Dasturchi uyquga ketayotib: "ertaga o'zgaruvchi nomlarini to'g'rilayman". Ertaga: x1, x2, x_new_final.
+99 little bugs in the code. Take one down, patch it around... 127 little bugs in the code.
+Tester bir stakan suv buyurtma qildi: 1, 0, 99999 ta, -1 ta, "abc" ta, null ta. Hammasi ishladi. Mijoz keldi, hojatxona qayerda deb so'radi — tizim ishdan chiqdi.
+Python va hayot o'xshash: bo'sh joyni (indent) to'g'ri tashlamasang, hammasi buziladi.
+AI: "Men sizning ishingizni olaman." Dasturchi: "Avval mening kodimni o'qib ko'r, keyin gaplashamiz."
+Why was the JavaScript developer sad? Because he didn't Node how to Express himself.
+A byte walks into a bar looking pale. The bartender asks: "What's wrong?" The byte replies: "I'm feeling a bit off — I think I lost a bit."
+!false — it's funny because it's true.
+Backup qilmaganlar ikki turga bo'linadi: hozircha omadli bo'lganlar va bo'lmaganlar.
+Server ishlamayapti? 1) Qayta ishga tushiring. 2) Yana qayta ishga tushiring. 3) Ishonch bilan "shunday bo'lishi kerak edi" deng.
+Stack Overflow'siz dasturlash — xaritasiz sayohat. Qiziq, lekin yo'lda ko'p yig'laysiz.
+
+# ---------- Hayotiy va quvnoq ----------
+Erta turish — o'zingiz bilan "bugun boshqacha bo'ladi" degan o'yin. Natija: odatdagidek.
+Ertalab soat 6 da turgan odamning kunlik rejasi: 6:01 — yana uxlash.
+Kofe: "Men sizga yordam beraman." Inson: "Sen mening yagona umidimsan."
+Choy ichishning 3 ta qoidasi: issiq bo'lsin, shirin bo'lsin va "bir pasda" 3 piyoladan oshmasin.
+Dieta boshlandi. Bugun dushanba. Dushanba o'tdi. Dieta ham o'tdi.
+Soat yarim tunda: "Hozir uxlayman." Soat 3: "Hozir uxlayman." Soat 5: "Endi uxlamasam ham bo'ladi."
+Ertaga boshlayman — eng uzoq davom etadigan reja.
+Ona: "Uy vazifang bormi?" — Bola: "Yo'q." — Ona: "Ishonaman." — Maktab kundaligi: "Uy vazifasi — 7 ta".
+Do'st — shunday odamki, siz hech narsa demasangiz ham sizning kayfiyatingizni tushunadi. Va baribir "nima bo'ldi?" deb so'raydi.
+I'm not lazy, I'm just on energy-saving mode.
+I told my computer I needed a break. Now it won't stop sending me Kit-Kat ads.
+Why don't scientists trust atoms? Because they make up everything.
+I used to hate facial hair, but then it grew on me.
+I would tell you a UDP joke, but you might not get it.
+Why did the scarecrow win an award? He was outstanding in his field.
+What do you call a fake noodle? An impasta.
+I only know 25 letters of the alphabet. I don't know y.
+Parallel lines have so much in common. It's a shame they'll never meet.
+What did one wall say to the other? "I'll meet you at the corner."
+I'm reading a book about anti-gravity. It's impossible to put down.
+Time flies like an arrow. Fruit flies like a banana.
+Why did the math book look sad? It had too many problems.
+Did you hear about the claustrophobic astronaut? He just needed a little space.
+I asked the librarian if the library had books on paranoia. She whispered: "They're right behind you."
+Bugun juma bo'lsa edi... Ha, juma bo'lganda ham dars bo'lardi.
+Haftaning eng uzun kuni — dushanba. Eng qisqa kuni — yakshanba. Bu fizika emas, bu tajriba.
+Uyqu — eng arzon dori, faqat uni "vaqtim yo'q" degan retseptsiz sotishmaydi.
+Yomg'ir yog'ayapti. Hamma: "Soyabonni olmabman." Ertasi kuni soyabonni olgan — quyosh chiqdi.
+Lift: "Men sizni ko'tarib chiqaman." Odam: "Rahmat." Lift: "Faqat siz tugmani bossangiz."
+Salomatlik — eng katta boylik. Lekin Wi-Fi paroli ham unchalik kam emas.
+Ish tugadi, mehnat tugamadi. Ish haqi tugadi, oy tugamadi.
+Telefon charchadi, odam ham. Farqi: telefonni zaryadga qo'yishadi.
+Soat 8: "Bugun hammasini bajaraman!" Soat 18: "Ertaga hammasini bajaraman!"
+Do'stlik — bu 2 odam kinoga borib, 40 daqiqa nima ko'rishni tanlagani, keyin uyda serial ko'rishidir.
+
+# ---------- Bot haqida ----------
+Bot ishini tugatdi: "Men hamma uchun darsga kirdim, endi menga kim kirib beradi?"
+Bu bot kofe ichmaydi, uxlamaydi, lekin baribir ba'zan "qayta ishga tushirish" kerak bo'ladi — xuddi sizga o'xshab.
+Bot: "Skaner qilindi!" Talabalar: "Rahmat, endi biz uxlay olamiz."
+Skaner tugadi. Hozir bot dam oladi (3 soniya).
+Bu xabarni o'qiyotgan odam eng yaxshi talaba. (Bot xushomad qilmaydi. Deyarli.)
+Bot: "Men 24/7 ishlayman." Dasturchi: "Men ham, faqat bepul."
+Domla ro'yxatni ochdi — hamma "Bor!" Bot esa allaqachon tinchgina hammani kiritgan edi.
+
+# ---------- Qo'shimcha ----------
+Talaba: Domla, bugun darsga kelolmayman, kasalman. Domla: Nima bo'ldi? Talaba: Dars haqida o'ylasam, boshim og'riydi.
+Eng ishonchli ob-havo prognozi: talaba soyabon olmagan kuni yomg'ir yog'adi.
+Kutubxonada eng jim joy — tokcha, undagi kitoblar yillardan beri hech kimga gapirmagan.
+Birinchi kurs: "Hammasini o'qiyman." To'rtinchi kurs: "Hammasi o'zi bir yo'lga tushadi."
+Guruhning eng faol a'zosi — chat. Eng jim a'zosi — "keldim" deb yozib qo'ygan talabalar.
+Dars jadvali o'zgardi! Hamma: yangi jadvalni ko'rdi. Hammasi: yana eskisiga qaytdi.
+Qo'ng'iroq soati — talabalar uchun eng sevimli ovoz (dars tugaganini bildirsa).
+Kechikib kirgan talaba domlaga: "Salom!" Domla: "Salom! Ammo men sizni yaxshi ko'raman, faqat vaqtida keling."
+The best thing about being on time? Nobody believes you.
+My code doesn't have bugs — it just develops random features.
+Programmers don't die, they just go into exception.
+Why do Java developers wear glasses? Because they don't C#.
+How many programmers does it take to change a light bulb? None — that's a hardware problem.
+Roses are red, violets are blue, unexpected '{' on line 32.
+I have a joke about UDP... but I don't care if you get it.
+Ctrl+C va Ctrl+V — dasturchining ikkita eng yaxshi do'sti. Ctrl+Z — uchinchisi, eng sodiqi.
+Eng tez internet: qo'shnining Wi-Fi'si, parolini bilmaguningcha.
+Bugun juda yaxshi kun bo'ladi. Faqat avval kofe ichay.
+Jiddiy hazil: sizning ismingiz hozir ro'yxatda va hammasi yaxshi.
+Eng yaxshi talaba — dars boshlanishidan oldin QR'ni skaner qiladigan talaba. Ikkinchi eng yaxshi — buni uning o'rniga qilgan do'sti.

@@ -1,0 +1,1764 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#FDFAF5">
+<link rel="icon" href="/logo.jpg">
+<title>Hero Scanner PRO</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  :root { --cream: #FDFAF5; --sand: #F2EBE0; --latte: #E8D9C5; --border: #D9C9B4; --brown: #B5895A; --brown-dk: #8B6340; --ink: #2A1F14; --ink-md: #6B5744; --ink-lt: #A8937D; --green: #3D8C5F; --green-bg: rgba(61,140,95,.1); --red: #C0392B; --red-bg: rgba(192,57,43,.08); --amber: #C07A1A; --amber-bg: rgba(192,122,26,.1);  --card: #fff; --white: #fff; --on-accent: #fff; --deep: #2A1F14; }
+  html, body { background: var(--cream); color: var(--ink); font-family: 'Plus Jakarta Sans', sans-serif; overflow-x: hidden; min-height: 100vh; }
+  #notification { position: fixed; top: -90px; left: 50%; transform: translateX(-50%); width: 92%; max-width: 400px; background: var(--cream); border: 1px solid var(--border); border-left: 4px solid var(--brown); padding: 14px 18px; border-radius: 14px; box-shadow: 0 8px 32px rgba(42,31,20,.12); transition: top .45s cubic-bezier(.68,-.55,.27,1.55); z-index: 9999; display: flex; align-items: center; gap: 12px; font-weight: 600; font-size: 14px; color: var(--ink); }
+  .screen { display: none; padding: 20px 18px; animation: slideUp .4s cubic-bezier(.16,1,.3,1) both; }
+  .active-screen { display: block; }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  .card { background:#fff; border: 1px solid var(--latte); border-radius: 20px; padding: 22px; margin-bottom: 16px; box-shadow: 0 2px 12px rgba(42,31,20,.05); }
+  .inp { width: 100%; padding: 14px 18px; border: 1.5px solid var(--latte); border-radius: 14px; background: var(--sand); color: var(--ink); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 15px; outline: none; margin-bottom: 12px; }
+  .inp:focus { border-color: var(--brown); background:#fff; }
+  .btn { width: 100%; padding: 15px; border: none; border-radius: 14px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn-primary { background: var(--ink); color: var(--cream); }
+  .btn-secondary { background: var(--sand); color: var(--ink-md); border: 1.5px solid var(--latte); }
+  .btn-brown { background: var(--brown); color: var(--on-accent); }
+  .header { display: flex; align-items: center; justify-content: space-between; padding: 18px 18px 0; margin-bottom: 20px; }
+  .header-title { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 700; color: var(--ink); }
+  .header-title em { font-style: italic; color: var(--brown); }
+  .icon-btn { width: 38px; height: 38px; border-radius: 10px; background: var(--sand); border: 1px solid var(--latte); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  #adminBtn { display: none; background: rgba(192,122,26,.1); color: var(--amber); border: 1px solid rgba(192,122,26,.25); padding: 9px 16px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+  .stat-card { background:#fff; border: 1px solid var(--latte); border-radius: 18px; padding: 20px 16px; text-align: center; }
+  .stat-card h3 { font-size: 10px; color: var(--ink-lt); text-transform: uppercase; font-weight: 600; margin-bottom: 8px; }
+  .stat-card p { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 700; color: var(--ink); }
+  .acc-item { background:#fff; border: 1.5px solid var(--latte); border-radius: 16px; padding: 18px; margin-bottom: 12px; border-left: 4px solid var(--border); }
+  .acc-item.active-acc { border-left-color: var(--green); }
+  .acc-item.error-acc { border-left-color: var(--red); }
+  .acc-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .acc-email { font-size: 14px; font-weight: 600; color: var(--ink); word-break: break-all; }
+  .badge { font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 8px; text-transform: uppercase; }
+  .badge-green { background: var(--green-bg); color: var(--green); }
+  .badge-red { background: var(--red-bg); color: var(--red); }
+  .acc-bottom { display: flex; justify-content: space-between; align-items: center; padding-top: 12px; border-top: 1px solid var(--sand); }
+  .action-group { display: flex; gap: 8px; }
+  .act-btn { background: var(--sand); border: 1px solid var(--latte); color: var(--ink-md); padding: 8px 12px; border-radius: 10px; font-size: 13px; cursor: pointer; }
+  .act-btn.del { color: var(--red); border-color: rgba(192,57,43,.2); background: var(--red-bg); }
+  .act-btn.reload { color: var(--amber); border-color: rgba(192,122,26,.2); background: var(--amber-bg); }
+  .scan-fixed { position: fixed; bottom: 15px; left: 5%; width: 90%; height: 64px; background: var(--ink); border: none; border-radius: 20px; color: var(--cream); font-weight: 800; font-size: 17px; display: flex; align-items: center; justify-content: center; gap: 12px; cursor: pointer; z-index: 100; box-shadow: 0 8px 28px rgba(42,31,20,.28); }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(42,31,20,.4); backdrop-filter: blur(8px); z-index: 5000; align-items: center; justify-content: center; }
+  .modal-box { background: var(--cream); border: 1px solid var(--latte); border-radius: 24px; padding: 28px; width: 88%; max-width: 420px; }
+  .modal-title { font-family: 'Playfair Display', serif; font-size: 1.3rem; font-weight: 700; color: var(--ink); margin-bottom: 6px; }
+  .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+  .acard { background:#fff; border: 1px solid var(--latte); border-radius: 16px; padding: 18px 14px; text-align: center; }
+  .acard h3 { font-size: 10px; color: var(--ink-lt); text-transform: uppercase; font-weight: 600; margin-bottom: 6px; }
+  .acard p { font-family: 'Playfair Display', serif; font-size: 1.8rem; font-weight: 700; color: var(--ink); }
+  .tab-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 20px; }
+  .tab-btn { flex-shrink: 0; background: var(--sand); color: var(--ink-md); border: 1px solid var(--latte); border-radius: 12px; padding: 10px 18px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .tab-btn.active-tab { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+  .admin-section { display: none; }
+  .admin-section.active { display: block; }
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tbl th { background: var(--sand); color: var(--ink-lt); font-size: 10px; text-transform: uppercase; font-weight: 600; padding: 12px 14px; text-align: left; }
+  .tbl td { padding: 14px; border-bottom: 1px solid var(--sand); color: var(--ink); white-space: nowrap; }
+  .tbl-wrap { background:#fff; border: 1px solid var(--latte); border-radius: 16px; overflow-x: auto; margin-bottom: 20px; }
+  .login-wrap { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 24px; }
+  .login-logo { width: 68px; height: 68px; background: var(--brown); border-radius: 20px; margin: 0 auto 24px; display: flex; align-items: center; justify-content: center; font-size: 2rem; box-shadow: 0 8px 24px rgba(181,137,90,.3); }
+  .login-title { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 700; color: var(--ink); text-align: center; margin-bottom: 8px; }
+  .login-card { width: 100%; max-width: 360px; background:#fff; border: 1px solid var(--latte); border-radius: 24px; padding: 28px; }
+  .info-strip { background: rgba(181,137,90,.08); border: 1px solid rgba(181,137,90,.2); border-radius: 12px; padding: 12px 16px; font-size: 12px; color: var(--ink-md); line-height: 1.6; margin-bottom: 16px; }
+  .star-rating { display: flex; gap: 5px; justify-content: center; margin-bottom: 15px; font-size: 2rem; cursor: pointer; color: var(--latte); }
+  .star-rating span.active { color: var(--amber); }
+  .shadow-btn { background: var(--sand); border: 1px solid var(--latte); color: var(--ink-lt); padding: 5px 9px; border-radius: 8px; font-size: 13px; cursor: pointer; transition: all .2s; }
+  .shadow-btn.active-shadow { background: rgba(192,57,43,.08); color: var(--red); border-color: rgba(192,57,43,.25); }
+  .modal-box.tall { max-height: 82vh; display: flex; flex-direction: column; }
+  .grp-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; margin: 12px 0 6px; }
+  .grp-title.ok { color: var(--green); } .grp-title.no { color: var(--red); }
+  .person { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--sand); font-size: 13px; }
+  .person .pn { font-weight: 600; color: var(--ink); } .person .pe { display: block; font-size: 11px; color: var(--ink-lt); font-weight: 500; word-break: break-all; }
+  .who { font-size: 12px; color: var(--ink-md); margin-top: 3px; }
+  .shadow-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; background: rgba(192,57,43,.08); color: var(--red); border: 1px solid rgba(192,57,43,.2); margin-left: 4px; vertical-align: middle; }
+  /* Dars jadvali */
+  .sch-bar { display:flex; gap:8px; margin-bottom:10px; }
+  .sch-bar select { flex:1; margin-bottom:0; min-width:0; }
+  .sch-bar .act-btn { white-space:nowrap; }
+  .sch-meta { font-size:12px; color:var(--ink-lt); margin:2px 2px 14px; line-height:1.6; }
+  .sch-err { background:var(--red-bg); color:var(--red); border:1px solid rgba(192,57,43,.2); border-radius:12px; padding:10px 14px; font-size:12px; margin-bottom:12px; }
+  .sch-day { margin-bottom:18px; }
+  .sch-day-h { display:flex; align-items:baseline; gap:8px; font-family:'Playfair Display', serif; font-weight:700; font-size:1.05rem; color:var(--ink); margin:0 2px 8px; }
+  .sch-day-h small { font-family:'Plus Jakarta Sans',sans-serif; font-size:11px; font-weight:600; color:var(--ink-lt); }
+  .sch-today { font-family:'Plus Jakarta Sans',sans-serif; font-size:10px; font-weight:700; text-transform:uppercase; background:var(--brown); color: var(--on-accent); border-radius:6px; padding:2px 7px; }
+  .sch-day.past { opacity:.55; }
+  .lesson { display:flex; gap:12px; background:#fff; border:1px solid var(--latte); border-left:4px solid var(--brown); border-radius:14px; padding:12px 14px; margin-bottom:8px; }
+  .lesson.now { border-left-color:var(--green); background:var(--green-bg); box-shadow:0 2px 10px rgba(61,140,95,.15); }
+  .l-time { min-width:48px; text-align:center; font-weight:700; font-size:13px; color:var(--ink); line-height:1.35; }
+  .l-time span { display:block; font-size:11px; font-weight:500; color:var(--ink-lt); }
+  .l-body { min-width:0; flex:1; }
+  .l-title { font-weight:700; font-size:14px; color:var(--ink); word-break:break-word; }
+  .l-sub { font-size:12px; color:var(--ink-md); margin-top:3px; word-break:break-word; }
+  .l-chip { display:inline-block; font-size:10px; font-weight:700; text-transform:uppercase; padding:2px 7px; border-radius:6px; background:var(--sand); color:var(--ink-md); border:1px solid var(--latte); margin-right:4px; }
+  .l-count { display:inline-block; font-size:11px; font-weight:700; background:var(--sand); border:1px solid var(--latte); border-radius:8px; padding:2px 8px; margin-top:6px; cursor:pointer; }
+  .l-people { font-size:12px; color:var(--ink-md); margin-top:8px; line-height:1.7; }
+  .l-people .off { opacity:.5; }
+  .auto-bar { display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--card); border:1px solid var(--latte); border-radius:14px; padding:10px 14px; margin-bottom:12px; font-size:12px; line-height:1.5; }
+  .sch-raw { font-size:11px; word-break:break-all; background:var(--sand); border-radius:10px; padding:10px; margin-top:8px; color:var(--ink-md); }
+
+  
+  /* v3 maket tuzatishlari */
+  .header { gap: 10px; flex-wrap: wrap; }
+  .header-title { font-size: 1.3rem; line-height: 1.2; }
+  .header > div:last-child { flex-shrink: 0; }
+  .stats-grid, .admin-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stat-card p { font-size: 1.7rem; }
+  .inp::placeholder { color: var(--ink-lt); opacity: .7; }
+
+  /* --- transcript --- */
+  .tr-hero { position: relative; overflow: hidden; background: var(--ink); color: var(--cream); border-radius: 24px; padding: 20px; margin-bottom: 14px; box-shadow: 0 8px 28px rgba(42,31,20,.18); }
+  .tr-hero::after { content: ''; position: absolute; right: -50px; top: -50px; width: 190px; height: 190px; border-radius: 50%; background: radial-gradient(circle, rgba(181,137,90,.5), rgba(181,137,90,0) 70%); pointer-events: none; }
+  .tr-hero > * { position: relative; z-index: 1; }
+  .tr-eyebrow { font-size: 10.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--brown); }
+  .tr-name { font-family: 'Playfair Display', serif; font-size: 1.35rem; font-weight: 700; letter-spacing: -.015em; line-height: 1.25; margin-top: 4px; word-break: break-word; }
+  .tr-id { font-size: 12px; color: var(--latte); opacity: .85; margin-top: 3px; word-break: break-all; }
+  .tr-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 18px; }
+  .tr-kpi { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); border-radius: 14px; padding: 11px 6px; text-align: center; }
+  .tr-kpi b { display: block; font-family: 'Playfair Display', serif; font-size: 1.4rem; line-height: 1.15; color: #fff; letter-spacing: -.02em; }
+  .tr-kpi span { display: block; margin-top: 2px; font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--latte); }
+  .tr-term { background: #fff; border: 1px solid var(--latte); border-radius: 20px; margin-bottom: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(42,31,20,.05); }
+  .tr-term-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px 16px; background: var(--sand); border-bottom: 1px solid var(--latte); }
+  .tr-term-h b { font-family: 'Playfair Display', serif; font-size: 1.05rem; letter-spacing: -.01em; }
+  .tr-term-h small { font-size: 11px; font-weight: 700; color: var(--ink-md); background: #fff; border: 1px solid var(--latte); border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+  .tr-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--sand); }
+  .tr-row:last-child { border-bottom: none; }
+  .tr-n { width: 26px; height: 26px; border-radius: 9px; background: var(--sand); color: var(--ink-lt); font-size: 11px; font-weight: 700; display: grid; place-items: center; flex-shrink: 0; }
+  .tr-main { min-width: 0; flex: 1; }
+  .tr-t { font-weight: 600; font-size: 14px; line-height: 1.35; word-break: break-word; }
+  .tr-s { font-size: 11.5px; color: var(--ink-lt); margin-top: 2px; }
+  .tr-g { text-align: right; flex-shrink: 0; }
+  .grade { display: inline-flex; justify-content: center; min-width: 38px; padding: 4px 10px; border-radius: 10px; font-size: 13px; font-weight: 800; letter-spacing: .01em; background: var(--sand); color: var(--ink-md); }
+  .grade.g-a { background: var(--green-bg); color: var(--green); }
+  .grade.g-b { background: rgba(181,137,90,.15); color: var(--brown-dk); }
+  .grade.g-c { background: var(--amber-bg); color: var(--amber); }
+  .grade.g-f { background: var(--red-bg); color: var(--red); }
+  .tr-sc { font-size: 11px; color: var(--ink-lt); margin-top: 3px; }
+  .tr-file { text-align: center; padding: 28px 20px; }
+  .tr-file .big { width: 64px; height: 64px; margin: 0 auto 14px; border-radius: 20px; background: var(--sand); display: grid; place-items: center; font-size: 2rem; }
+  .tr-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
+  .tr-actions .btn { min-height: 46px; font-size: 13px; padding: 0 10px; }
+  .empty-box { text-align: center; padding: 32px 20px; background: #fff; border: 1px solid var(--latte); border-radius: 18px; color: var(--ink-lt); font-size: 13.5px; line-height: 1.6; }
+
+  .sch-bar .act-btn { min-width:46px; }
+
+  /* ===== v6 · asl uslub saqlangan, faqat jilo berilgan ===== */
+  :root { --sh: 0 1px 2px rgba(42,31,20,.04), 0 4px 16px rgba(42,31,20,.06); --ring: 0 0 0 4px rgba(181,137,90,.16); }
+  body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; line-height: 1.55; }
+  button { font-family: inherit; -webkit-tap-highlight-color: transparent; }
+  .screen { max-width: 560px; margin: 0 auto; }
+  #adminScreen { max-width: 760px; }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+
+  /* sarlavha: ikki qatorli, tugmalarga tegmaydi */
+  .header { flex-wrap: nowrap; align-items: center; gap: 12px; padding: 22px 4px 0; margin-bottom: 20px; }
+  .header-title { flex: 1; min-width: 0; font-size: 1.55rem; line-height: 1.12; letter-spacing: -.025em; }
+  .header-title em { display: block; font-weight: 600; }
+  .header > div:last-child { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+  .icon-btn { width: 42px; height: 42px; border-radius: 13px; font-size: 17px; background: #fff; box-shadow: var(--sh); transition: transform .15s, background .2s; }
+  .icon-btn:hover { background: var(--sand); }
+  .icon-btn:active, .btn:active, .act-btn:active, .tab-btn:active { transform: scale(.97); }
+  #adminBtn { height: 42px; padding: 0 14px; border-radius: 13px; white-space: nowrap; letter-spacing: .02em; font-family: inherit; box-shadow: var(--sh); }
+
+  /* yozuvlar */
+  .card-title { font-family: 'Playfair Display', serif; font-size: 1.2rem; font-weight: 700; letter-spacing: -.015em; color: var(--ink); line-height: 1.25; }
+  .card-sub { font-size: 12.5px; color: var(--ink-lt); margin: 4px 0 18px; line-height: 1.55; }
+  .sec-label { display: flex; align-items: center; gap: 12px; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-lt); margin: 26px 2px 12px; }
+  .sec-label::after { content: ''; flex: 1; height: 1px; background: var(--latte); }
+  .stat-card, .acard { box-shadow: var(--sh); }
+  .stat-card h3, .acard h3 { letter-spacing: .12em; font-weight: 700; }
+  .stat-card p, .acard p { letter-spacing: -.02em; }
+  .card { box-shadow: var(--sh); border-radius: 24px; }
+
+  /* maydon va tugmalar */
+  .inp { font-size: 15px; transition: border-color .2s, box-shadow .2s, background .2s; }
+  .inp:focus { box-shadow: var(--ring); }
+  .btn { min-height: 54px; padding: 0 20px; letter-spacing: .01em; transition: transform .15s, background .2s, box-shadow .2s; }
+  .btn:disabled { opacity: .6; pointer-events: none; }
+  .btn-primary { box-shadow: 0 6px 16px rgba(42,31,20,.20); }
+  .btn-brown { box-shadow: 0 6px 16px rgba(181,137,90,.32); }
+  .btn-secondary:hover { background: var(--latte); }
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+  .act-btn { min-width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 12px; font-family: inherit; font-weight: 600; white-space: nowrap; }
+  .tab-btn { font-family: inherit; border-radius: 999px; padding: 0 18px; height: 40px; display: inline-flex; align-items: center; transition: background .2s, color .2s, transform .15s; }
+  .tab-row { scrollbar-width: none; gap: 8px; }
+  .tab-row::-webkit-scrollbar { display: none; }
+  .acc-bottom .action-group { gap: 8px; }
+  .badge { border-radius: 999px; letter-spacing: .06em; }
+
+  /* skaner tugmasi: pastdan kesilmaydi, orqasi yumshoq */
+  .scan-dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 100; padding: 30px 5% calc(16px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(to top, var(--cream) 55%, rgba(253,250,245,0)); pointer-events: none; }
+  .scan-dock .scan-fixed { position: static; width: 100%; max-width: 524px; margin: 0 auto; pointer-events: auto; font-family: inherit; letter-spacing: .01em; transition: transform .15s; }
+  .scan-dock .scan-fixed:active { transform: scale(.98); }
+
+  /* admin: asboblar tugmalari tartibi */
+  .tool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 22px; }
+  .tool-grid .btn { min-height: 50px; padding: 10px 12px; font-size: 13.5px; text-align: center; }
+  .tool-grid .tool-wide { grid-column: 1 / -1; }
+  .tbl th { letter-spacing: .1em; font-weight: 700; }
+  .tbl tbody tr:hover td { background: #FFFCF7; }
+  .sch-bar .act-btn { height: 50px; min-width: 50px; border-radius: 14px; }
+  .lesson { box-shadow: var(--sh); }
+  .modal-box { box-shadow: 0 28px 70px rgba(42,31,20,.28); }
+  @media (max-width: 360px) { .header-title { font-size: 1.35rem; } .icon-btn, #adminBtn { height: 38px; } .icon-btn { width: 38px; } }
+
+  /* --- hisobot --- */
+  .rp-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .rp-chip { height: 36px; padding: 0 14px; border-radius: 999px; background: #fff; border: 1.5px solid var(--latte); font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--ink-md); cursor: pointer; }
+  .rp-chip.on { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+  .rp-dates { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; gap: 8px; margin-bottom: 14px; align-items: end; }
+  .rp-dates > div { min-width: 0; } .rp-dates .inp { min-width: 0; width: 100%; padding: 0 8px; font-size: 13px; }
+  .rp-dates label { display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-lt); margin-bottom: 4px; }
+  .rp-dates .inp { margin: 0; height: 46px; padding: 0 12px; font-size: 14px; }
+  .rp-dates .act-btn { height: 46px; padding: 0 14px; border-radius: 14px; }
+  .rp-period { background: var(--ink); color: var(--cream); border-radius: 20px; padding: 16px 18px; margin-bottom: 12px; }
+  .rp-period b { font-family: 'Playfair Display', serif; font-size: 1.15rem; display: block; margin-bottom: 4px; }
+  .rp-period span { font-size: 12px; color: var(--latte); display: block; line-height: 1.6; }
+  .rp-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+  .rp-kpi { background: #fff; border: 1px solid var(--latte); border-radius: 16px; padding: 12px 6px; text-align: center; }
+  .rp-kpi b { display: block; font-family: 'Playfair Display', serif; font-size: 1.45rem; line-height: 1.15; color: var(--ink); }
+  .rp-kpi span { display: block; margin-top: 3px; font-size: 9.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-lt); }
+  .rp-kpi.good b { color: var(--green); } .rp-kpi.bad b { color: var(--red); }
+  .rp-box { background: #fff; border: 1px solid var(--latte); border-radius: 18px; margin-bottom: 10px; overflow: hidden; }
+  .rp-box > summary { list-style: none; cursor: pointer; padding: 14px 16px; font-family: 'Playfair Display', serif; font-weight: 700; font-size: 1.02rem; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .rp-box > summary::-webkit-details-marker { display: none; }
+  .rp-box > summary small { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 11px; font-weight: 700; color: var(--ink-lt); background: var(--sand); border-radius: 999px; padding: 3px 10px; }
+  .rp-box[open] > summary { border-bottom: 1px solid var(--latte); background: var(--sand); }
+  .rp-box .tbl-wrap { border: none; border-radius: 0; margin: 0; }
+  .rp-scan { border-bottom: 1px solid var(--sand); }
+  .rp-scan:last-child { border-bottom: none; }
+  .rp-scan > summary { list-style: none; cursor: pointer; padding: 12px 16px; display: block; }
+  .rp-scan > summary::-webkit-details-marker { display: none; }
+  .rp-time { font-weight: 700; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  .rp-les { font-size: 13px; margin-top: 2px; word-break: break-word; }
+  .rp-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; align-items: center; font-size: 11.5px; color: var(--ink-lt); }
+  .rp-pill { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: var(--sand); color: var(--ink-md); }
+  .rp-pill.ok { background: var(--green-bg); color: var(--green); } .rp-pill.no { background: var(--red-bg); color: var(--red); } .rp-pill.mid { background: var(--amber-bg); color: var(--amber); }
+  .rp-items { padding: 4px 16px 12px; }
+  .rp-it { display: flex; gap: 10px; padding: 8px 0; border-top: 1px dashed var(--latte); font-size: 12.5px; align-items: flex-start; }
+  .rp-it:first-child { border-top: none; }
+  .rp-it .ic { flex-shrink: 0; width: 20px; }
+  .rp-it .nm { font-weight: 600; word-break: break-word; }
+  .rp-it .em { display: block; color: var(--ink-lt); font-size: 11.5px; word-break: break-all; }
+  .rp-it .ms { display: block; color: var(--amber); font-size: 11.5px; }
+  .rp-note { font-size: 12px; color: var(--ink-lt); padding: 4px 2px 12px; line-height: 1.6; }
+  .joke-box { background: var(--sand); border: 1px dashed var(--border); border-radius: 16px; padding: 12px 14px; margin-bottom: 14px; font-size: 13px; line-height: 1.55; color: var(--ink-md); }
+  .joke-ic { margin-right: 8px; }
+  .note-box { background: var(--amber-bg); border: 1px solid rgba(192,122,26,.25); border-radius: 14px; padding: 11px 14px; margin-bottom: 12px; font-size: 12.5px; line-height: 1.6; color: var(--ink-md); }
+  .jk-item { background:#fff; border:1px solid var(--latte); border-radius:16px; padding:12px 14px; margin-top:10px; display:flex; gap:10px; align-items:flex-start; }
+  .jk-text { flex:1; min-width:0; font-size:13.5px; line-height:1.55; word-break:break-word; }
+  .jk-acts { display:flex; gap:6px; flex-shrink:0; }
+  .jk-item textarea.inp { margin:0 0 8px; }
+  .jk-edit-btns { display:flex; gap:8px; }
+  .jk-edit-btns .act-btn { flex:1; height:40px; }
+
+  /* --- til, davomat, GPA, salomatlik, suhbat nazorati, jurnal --- */
+  .lang-sw { display: inline-flex; gap: 2px; background: #fff; border: 1px solid var(--latte); border-radius: 12px; padding: 3px; }
+  .lang-sw button { border: none; background: transparent; font-family: inherit; font-size: 11.5px; font-weight: 700; letter-spacing: .05em; color: var(--ink-lt); height: 28px; padding: 0 10px; border-radius: 9px; cursor: pointer; }
+  .lang-sw button.on { background: var(--ink); color: var(--cream); }
+  .lang-row { display: flex; justify-content: flex-end; margin: -6px 0 10px; }
+  .login-lang { position: absolute; top: 14px; right: 14px; z-index: 5; }
+  .att-card { background: #fff; border: 1px solid var(--latte); border-radius: 18px; padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 2px 12px rgba(42,31,20,.05); }
+  .att-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .att-name { font-weight: 700; font-size: 14px; word-break: break-word; }
+  .att-pct { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 700; }
+  .att-pct.good { color: var(--green); } .att-pct.bad { color: var(--red); }
+  .att-bar { height: 8px; background: var(--sand); border-radius: 99px; overflow: hidden; margin: 8px 0 10px; }
+  .att-bar i { display: block; height: 100%; background: var(--brown); border-radius: 99px; }
+  .att-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--ink-md); }
+  .att-meta .k, .att-miss .k { color: var(--ink-lt); font-weight: 600; margin-right: 3px; }
+  .att-more { margin-top: 10px; font-size: 12.5px; } .att-more summary { cursor: pointer; font-weight: 600; color: var(--brown-dk); }
+  .att-sub { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--latte); }
+  .att-miss { margin-top: 8px; color: var(--ink-md); line-height: 1.7; }
+  .hl-row { display: flex; gap: 10px; justify-content: space-between; align-items: flex-start; padding: 11px 0; border-bottom: 1px solid var(--sand); }
+  .hl-row:last-child { border-bottom: none; }
+  .hl-main { min-width: 0; flex: 1; font-size: 13.5px; } .hl-main .em, .ch-card .em { display: block; font-size: 11.5px; color: var(--ink-lt); word-break: break-all; margin-top: 2px; }
+  .hl-main .ms { display: block; font-size: 11.5px; color: var(--amber); margin-top: 2px; }
+  .hl-side { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; flex-shrink: 0; }
+  .ch-card { background: #fff; border: 1px solid var(--latte); border-left: 4px solid var(--red); border-radius: 16px; padding: 12px 14px; margin-bottom: 10px; }
+  .ch-card.done { border-left-color: var(--border); opacity: .75; }
+  .ch-top { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; color: var(--ink-lt); }
+  .ch-text { margin: 8px 0 4px; padding: 10px 12px; background: var(--sand); border-radius: 12px; font-size: 13.5px; line-height: 1.55; word-break: break-word; }
+  .ch-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .au-row { background: #fff; border: 1px solid var(--latte); border-radius: 14px; padding: 10px 14px; margin-top: 8px; }
+  .au-top { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; } .au-top span { color: var(--ink-lt); font-size: 11.5px; white-space: nowrap; }
+  .au-sub { font-size: 12px; color: var(--ink-md); margin-top: 3px; word-break: break-word; }
+  .au-res { font-size: 11.5px; color: var(--green); margin-top: 3px; } .au-res.bad { color: var(--red); }
+  .jk-votes { font-size: 11.5px; color: var(--ink-lt); margin-top: 4px; }
+
+  /* ===== 💬 Suhbat (mini-ilova) ===== */
+  .mc-tabs { display:flex; gap:6px; margin-bottom:12px; overflow-x:auto; }
+  .mc-tabs button { flex:1; min-width:0; white-space:nowrap; padding:10px 8px; border-radius:12px; border:1.5px solid var(--latte); background:var(--sand); color:var(--ink-md); font:600 13px 'Plus Jakarta Sans',sans-serif; cursor:pointer; }
+  .mc-tabs button.on { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .mc-card { background:#fff; border:1px solid var(--latte); border-radius:16px; padding:14px 16px; margin-bottom:10px; }
+  .mc-top { display:flex; justify-content:space-between; gap:8px; align-items:baseline; font-size:13px; margin-bottom:6px; }
+  .mc-top span { color:var(--ink-lt); font-size:11.5px; white-space:nowrap; }
+  .mc-text { font-size:14.5px; line-height:1.5; white-space:pre-wrap; word-break:break-word; }
+  .mc-meta { font-size:11.5px; color:var(--ink-lt); margin-top:6px; }
+  .mc-acts { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+  .mc-reply { display:none; margin-top:10px; }
+  .mc-reply.open { display:block; }
+  .mc-row { display:flex; align-items:center; gap:8px; font-size:13.5px; margin:6px 0 12px; }
+  .mc-list-btn { display:block; width:100%; text-align:left; margin-bottom:8px; }
+</style>
+</head>
+<body>
+
+<div id="notification"><span id="notifyIcon"></span><span id="notifyText" style="flex:1"></span></div>
+
+<div id="editModal" class="modal-overlay" style="z-index:4000">
+  <div class="modal-box">
+    <div class="modal-title">Profilni Tahrirlash</div>
+    <div style="font-size:12px;color:var(--ink-lt);margin-bottom:15px;">Faqat @newuu.uz domeni qabul qilinadi. Parolingiz shifrlanadi.</div>
+    <input type="hidden" id="editId">
+    <input type="text" id="editEmail" class="inp" placeholder="Yangi Email (@newuu.uz)">
+    <input type="password" id="editPass" class="inp" placeholder="Yangi Parol">
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="document.getElementById('editModal').style.display='none'">Bekor</button>
+      <button class="btn btn-primary" onclick="saveEdit()">Saqlash</button>
+    </div>
+  </div>
+</div>
+
+<div id="resultModal" class="modal-overlay">
+  <div class="modal-box tall">
+    <div class="modal-title" id="resultTitle">Skaner Natijasi</div>
+    <div id="resultSub" style="font-size:12px;color:var(--ink-lt);margin-bottom:4px;"></div>
+    <div id="resultList" style="overflow-y:auto; flex-grow:1; margin-bottom:16px;"></div>
+    <div id="resultNote" class="note-box" style="display:none"></div>
+    <div id="resultJoke" class="joke-box" style="display:none"></div>
+    <button class="btn btn-secondary" onclick="document.getElementById('resultModal').style.display='none'; loadData();">Yopish</button>
+  </div>
+</div>
+
+<div id="trModal" class="modal-overlay" style="z-index:6000">
+  <div class="modal-box tall" style="max-width:720px;width:94%">
+    <div class="modal-title">🎓 Transcript fayli</div>
+    <div id="trPages" style="flex:1;min-height:55vh;overflow:auto;border:1px solid var(--latte);border-radius:14px;background:var(--sand);margin:12px 0 14px;padding:8px;-webkit-overflow-scrolling:touch"></div>
+    <button class="btn btn-secondary" onclick="closeTrModal()">Yopish</button>
+  </div>
+</div>
+
+<div id="loginScreen" class="screen" style="position:relative"><div class="login-lang"><div class="lang-sw"><button data-l="uz" onclick="setLang('uz')">UZ</button><button data-l="en" onclick="setLang('en')">EN</button><button data-l="ru" onclick="setLang('ru')">RU</button></div></div>
+  <div class="login-wrap">
+    <div class="login-logo">🔮</div>
+    <div class="login-title">Hero Scanner <em>PRO</em></div>
+    <div style="color:var(--ink-lt); font-size:14px; text-align:center; margin-bottom:32px;">Botdan olingan kalitni kiriting</div>
+    <div class="login-card">
+      <input type="text" id="loginInp" class="inp" placeholder="Login (hero_...)">
+      <input type="password" id="passInp" class="inp" placeholder="Parol">
+      <button class="btn btn-primary" onclick="doLogin()">Tizimga Kirish →</button>
+    </div>
+  </div>
+</div>
+
+<div id="dashboardScreen" class="screen">
+  <div class="lang-row"><div class="lang-sw"><button data-l="uz" onclick="setLang('uz')">UZ</button><button data-l="en" onclick="setLang('en')">EN</button><button data-l="ru" onclick="setLang('ru')">RU</button></div></div>
+  <div class="header">
+    <div class="header-title">Boshqaruv <em>paneli</em></div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button onclick="switchTab('shareScreen')" class="icon-btn" title="Ulashish">🔗</button>
+      <button onclick="switchTab('chatScreen')" class="icon-btn" title="Suhbat">✉️</button>
+      <button onclick="switchTab('feedbackScreen')" class="icon-btn" title="Fikr qoldirish">💬</button>
+      <button id="adminBtn" onclick="switchTab('adminScreen')">⚡ Admin</button>
+      <div class="icon-btn" onclick="doLogout()" title="Chiqish">🚪</div>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card"><h3>Jami Akkaunt</h3><p id="statTotal">—</p></div>
+    <div class="stat-card"><h3>So'nggi Natija</h3><p id="statLast">—</p></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Yangi profil qo'shish</div>
+    <div class="card-sub">Faqat @newuu.uz domeni. Parolingiz shifrlab saqlanadi.</div>
+    <input type="text" id="newEmail" class="inp" placeholder="Email (@newuu.uz)">
+    <input type="password" id="newPass" class="inp" placeholder="Hero Paroli">
+    <button class="btn btn-secondary" onclick="addAccount()">+ Qo'shish va Tekshirish</button>
+  </div>
+
+  <div class="sec-label">Faol profillar</div>
+  <div id="accountList"><div style="text-align:center; padding:32px; background:#fff; border-radius:16px;">Yuklanmoqda...</div></div>
+  
+  <div class="sec-label" id="attLabel" style="display:none">Davomat</div>
+  <div id="attBox"></div>
+  <div style="height: 110px;"></div>
+  <div class="scan-dock"><button class="scan-fixed" onclick="startScan()">📷 Skanerlashni Boshlash</button></div>
+</div>
+
+<div id="feedbackScreen" class="screen">
+  <div class="header">
+    <div class="header-title">Fikr <em>Qoldirish</em></div>
+    <button class="tab-btn" onclick="switchTab('dashboardScreen')">← Orqaga</button>
+  </div>
+  <div class="info-strip">Ilovani yaxshilashimiz uchun o'z fikringiz, topilgan xatoliklar yoki takliflaringizni yozib qoldiring.</div>
+  <div class="card">
+    <select id="fbType" class="inp">
+      <option value="General">Umumiy Fikr</option>
+      <option value="Bug Report">Xatolik (Bug) haqida</option>
+      <option value="Improvement">Yaxshilash Taklifi</option>
+    </select>
+    <div style="text-align:center; font-size:13px; color:var(--ink-lt); margin-bottom:5px;">Baholang</div>
+    <div class="star-rating" id="stars">
+      <span onclick="setRating(1)">★</span><span onclick="setRating(2)">★</span>
+      <span onclick="setRating(3)">★</span><span onclick="setRating(4)">★</span><span onclick="setRating(5)">★</span>
+    </div>
+    <textarea id="fbMessage" class="inp" rows="4" placeholder="Xabaringizni bu yerga yozing..."></textarea>
+    <button class="btn btn-primary" onclick="sendFeedback()">📤 Yuborish</button>
+  </div>
+</div>
+
+<div id="shareScreen" class="screen">
+  <div class="header">
+    <div class="header-title">Ulashish <em>markazi</em></div>
+    <button class="tab-btn" onclick="switchTab('dashboardScreen')">← Orqaga</button>
+  </div>
+  <div data-i18n="share_info" class="info-strip">🔒 <b>Xavfsiz:</b> Do'stingiz skaner qilganda sizga ham davomat uriladi, lekin u sizning pochta va parolingizni <b>hech qachon ko'ra olmaydi</b>.</div>
+  
+  <div class="card">
+    <div class="card-title" style="margin-bottom:14px">📤 Kod yaratish</div>
+    <div id="shareCodeBox" style="display:none; margin-bottom:16px;">
+      <div style="background:var(--sand); border:1.5px dashed var(--brown); border-radius:14px; padding:18px; text-align:center;">
+        <div id="shareCodeVal" style="font-family:monospace; font-size:2rem; font-weight:700; letter-spacing:3px;"></div>
+        <div id="shareCodeExpiry" style="font-size:11px; color:var(--ink-lt); margin-top:6px;"></div>
+      </div>
+      <button class="btn btn-secondary" onclick="copyShareCode()" style="margin-top:10px;">📋 Nusxalash</button>
+    </div>
+    <button class="btn btn-primary" id="generateShareBtn" onclick="generateShareCode()">✨ Yangi Kod Yaratish</button>
+  </div>
+
+  <div class="card">
+    <div class="card-title" style="margin-bottom:14px">📥 Kodni qo'llash</div>
+    <input type="text" id="importCodeInp" class="inp" placeholder="Masalan: A3X7KQ" style="text-align:center; font-family:monospace; font-size:1.1rem; letter-spacing:2px;">
+    <button class="btn btn-brown" onclick="importShareCode()">🔗 Ulashishni Qabul Qilish</button>
+  </div>
+  
+  <div class="sec-label">Mavjud ulanishlar</div>
+  <div id="shareConnectionsList"></div>
+</div>
+
+<div id="chatScreen" class="screen">
+  <div class="header">
+    <div class="header-title">Suhbat <em>xabarlari</em></div>
+    <button class="tab-btn" onclick="switchTab('dashboardScreen')">← Orqaga</button>
+  </div>
+  <div class="info-strip">🎭 Anonim yuborsangiz, qabul qiluvchi ismingizni ko'rmaydi, lekin sizga anonim javob yoza oladi. Havola yuborish taqiqlangan. Xavfsizlik uchun admin barcha xabarlarni ko'ra oladi.</div>
+  <div class="mc-tabs" id="mcTabs">
+    <button data-t="in" onclick="mcTab('in')">📥 Kelgan</button><button data-t="out" onclick="mcTab('out')">📤 Yuborilgan</button>
+    <button data-t="new" onclick="mcTab('new')">✍️ Yozish</button><button data-t="set" onclick="mcTab('set')">⚙️</button>
+  </div>
+  <div id="mcBody"><div class="empty-box">Yuklanmoqda...</div></div>
+</div>
+
+<div id="adminScreen" class="screen">
+  <div class="header">
+    <div class="header-title">Admin <em>Markazi</em></div>
+    <button class="tab-btn" onclick="switchTab('dashboardScreen')">← Orqaga</button>
+  </div>
+  <div class="admin-grid">
+    <div class="acard"><h3>User</h3><p id="admUsers">0</p></div>
+    <div class="acard"><h3>Akk</h3><p id="admHeroes">0</p></div>
+    <div class="acard"><h3>Skaner</h3><p id="admScans">0</p></div>
+    <div class="acard"><h3>Aktiv</h3><p id="admActive">0</p></div>
+  </div>
+  
+  <div class="tool-grid">
+  <button id="backupBtn" class="btn btn-primary tool-wide" onclick="exportAdminBackup()">💾 To'liq zaxira (Excel + JSON)</button>
+  <button id="importBtn" class="btn btn-secondary" onclick="document.getElementById('importFile').click()">📥 Import (JSON)</button>
+  <input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="importAdminBackup(this)">
+  <button id="syncBtn" class="btn btn-secondary" onclick="syncUsernames()">🔄 Username yangilash</button>
+  </div>
+
+  <div class="tab-row">
+    <button class="tab-btn active-tab" onclick="showAdminSection('secUsers', this)">👥 Userlar</button>
+    <button class="tab-btn" onclick="showAdminSection('secPass',  this)">🔐 Parollar</button>
+    <button class="tab-btn" onclick="showAdminSection('secLogs',  this)">⏱ Tarix</button>
+    <button class="tab-btn" onclick="showAdminSection('secReport', this)">📋 Hisobot</button>
+    <button class="tab-btn" onclick="showAdminSection('secJokes', this)">😄 Hazillar</button>
+    <button class="tab-btn" onclick="showAdminSection('secHealth', this)">🩺 Salomatlik</button>
+    <button class="tab-btn" onclick="showAdminSection('secChat', this)">🛡 Suhbat</button>
+    <button class="tab-btn" onclick="showAdminSection('secAudit', this)">📜 Jurnal</button>
+    <button class="tab-btn" onclick="showAdminSection('secArch',  this)">📦 Arxiv</button>
+    <button class="tab-btn" onclick="showAdminSection('secSched', this)">📅 Dars jadvali</button>
+    <button class="tab-btn" onclick="showAdminSection('secLessons', this)">📚 Darslar</button>
+    <button class="tab-btn" onclick="showAdminSection('secTranscript', this)">🎓 Transcript</button>
+  </div>
+
+  <div id="secUsers" class="admin-section active"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>User</th><th>Akk</th><th>Obuna</th><th>Sharpa</th><th>Blok</th><th>Amal</th></tr></thead><tbody id="adminUsersList"></tbody></table></div></div>
+  <div id="secPass" class="admin-section"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Egasi</th><th>Ism Familya</th><th>ID</th><th>Email</th><th>Parol</th></tr></thead><tbody id="adminPassList"></tbody></table></div></div>
+  <div id="secHealth" class="admin-section">
+    <div class="rp-period" style="margin-bottom:12px"><b>🩺 Akkaunt salomatligi</b><span>Token holati va so'nggi skanerlar bo'yicha muammoli akkauntlar. Muammo 2 tekshiruv (≈1 soat) davom etsa, egasiga bot orqali xabar boradi.</span></div>
+    <div id="hlBody"><div class="empty-box">Yuklanmoqda...</div></div>
+  </div>
+  <div id="secChat" class="admin-section">
+    <div class="rp-period" style="margin-bottom:12px"><b>🛡 Suhbat nazorati</b><span>/suhbat bo'yicha barcha xabarlar (kim kimga yozgani, anonim ham), shikoyatlar va chetlatilganlar.</span></div>
+    <div class="tool-grid" style="margin-bottom:10px"><button class="btn btn-secondary" id="chTabPairs" onclick="chatTab('pairs')">👥 Suhbatlar</button><button class="btn btn-secondary" id="chTabLog" onclick="chatTab('log')">💬 Barcha xabarlar</button><button class="btn btn-secondary" id="chTabRep" onclick="chatTab('rep')">⚠️ Shikoyatlar</button></div>
+    <div id="chBody"><div class="empty-box">Yuklanmoqda...</div></div>
+  </div>
+  <div id="secAudit" class="admin-section">
+    <div class="rp-period" style="margin-bottom:12px"><b>📜 Admin amallari jurnali</b><span>Kim, qachon, nimani o'zgartirgani (180 kun saqlanadi). Parollar va tokenlar yozilmaydi.</span></div>
+    <input type="text" id="auSearch" class="inp" placeholder="🔎 Qidirish: admin, amal, email..." oninput="auSearch()">
+    <div id="auBody"><div class="empty-box">Yuklanmoqda...</div></div>
+  </div>
+  <div id="secJokes" class="admin-section">
+    <div class="rp-period" style="margin-bottom:12px"><b>😄 Hazillar</b><span id="jkCount">Yuklanmoqda...</span>
+      <span style="opacity:.8">Skanerdan keyin xabarda tasodifiy bitta hazil chiqadi. O'zbekcha ham, inglizcha ham bo'ladi.</span></div>
+    <div class="card" style="padding:16px;margin-bottom:12px">
+      <div class="card-title" style="font-family:'Playfair Display',serif;font-weight:700;font-size:1.05rem;margin-bottom:8px">Yangi hazil qo'shish</div>
+      <textarea id="jkNew" class="inp" rows="3" placeholder="Har qatorga bitta hazil yozing..." maxlength="20000"></textarea>
+      <button class="btn btn-brown" onclick="jokesAddText()" style="margin-top:2px">＋ Qo'shish</button>
+    </div>
+    <div class="tool-grid" style="margin-bottom:12px">
+      <button class="btn btn-secondary" onclick="jokesPickFile(false)">📤 Fayldan qo'shish</button>
+      <button class="btn btn-secondary" onclick="jokesPickFile(true)">♻️ Fayl bilan almashtirish</button>
+      <button class="btn btn-secondary tool-wide" onclick="jokesSendFile()">📨 Hozirgi ro'yxatni Telegramga fayl qilib olish</button>
+    </div>
+    <input type="file" id="jkFile" accept=".txt,text/plain" style="display:none" onchange="jokesFileChosen(this)">
+    <div class="rp-chips" style="margin-bottom:8px"><button class="rp-chip on" id="jkS0" onclick="jkSort(0)">🆕 Yangilari</button><button class="rp-chip" id="jkS1" onclick="jkSort(1)">⭐ Reyting bo'yicha</button><button class="rp-chip" id="jkS2" onclick="jkSort(2)">👎 Yoqmaganlar</button></div>
+    <input type="text" id="jkSearch" class="inp" placeholder="🔎 Hazillar ichidan qidirish..." oninput="renderJokes()">
+    <div id="jkList"></div>
+    <div class="rp-note">Botga ham yuborish mumkin: Telegramda <b>/hazillar</b> yozing, so'ng .txt fayl yuboring (sarlavhaga <b>almashtirish</b> deb yozsangiz, hammasi almashtiriladi).</div>
+  </div>
+  <div id="secReport" class="admin-section">
+    <div class="rp-chips" id="rpChips">
+      <button class="rp-chip" data-k="today" onclick="rpQuick('today')">Bugun</button>
+      <button class="rp-chip" data-k="yesterday" onclick="rpQuick('yesterday')">Kecha</button>
+      <button class="rp-chip" data-k="7" onclick="rpQuick('7')">7 kun</button>
+      <button class="rp-chip" data-k="30" onclick="rpQuick('30')">30 kun</button>
+    </div>
+    <div class="rp-dates">
+      <div><label>Dan</label><input type="date" id="rpFrom" class="inp" onchange="rpCustom()"></div>
+      <div><label>Gacha</label><input type="date" id="rpTo" class="inp" onchange="rpCustom()"></div>
+      <button class="act-btn" onclick="sendReport()" title="Excel hisobotni Telegramga yuborish">📨 Excel</button>
+    </div>
+    <div id="rpBody"><div class="empty-box">Yuklanmoqda...</div></div>
+  </div>
+  <div id="secLogs" class="admin-section"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Mualif</th><th>Natija</th><th>Dars</th><th>Vaqt (Toshkent)</th></tr></thead><tbody id="adminLogsList"></tbody></table></div></div>
+  <div id="secSched" class="admin-section">
+    <div class="sch-bar">
+      <select id="schedSel" class="inp" onchange="loadScheduleDetail(this.value)"></select>
+      <button class="act-btn reload" onclick="refreshSchedule(false)" title="Shu akkaunt jadvalini hozir yangilash">🔄</button>
+      <button class="act-btn" onclick="refreshSchedule(true)" title="Hamma akkaunt jadvalini yangilash">🔄 Hammasi</button>
+    </div>
+    <div id="schedBody"><div style="text-align:center;padding:32px;background:#fff;border-radius:16px;color:var(--ink-lt)">Yuklanmoqda...</div></div>
+  </div>
+  <div id="secLessons" class="admin-section">
+    <div class="auto-bar"><div id="autoTxt">Yuklanmoqda...</div><button id="autoBtn" class="act-btn" onclick="toggleLessonAuto()">…</button></div>
+    <div class="tool-grid" style="margin:0 0 12px">
+      <button class="btn btn-secondary" onclick="loadLessons()">🔄 Ro'yxatni yangilash</button>
+      <button class="btn btn-brown" id="lessonsSyncBtn" onclick="lessonsSyncAll()">📥 Hero'dan yuklash</button>
+    </div>
+    <div id="lessonsBody"><div style="text-align:center;padding:32px;background:#fff;border-radius:16px;color:var(--ink-lt)">Yuklanmoqda...</div></div>
+  </div>
+  <div id="secTranscript" class="admin-section">
+    <div class="sch-bar">
+      <select id="trSel" class="inp" onchange="loadTranscriptDetail(this.value, true)"></select>
+      <button class="act-btn reload" onclick="refreshTranscript()" title="Hero'dan transcriptni qayta olish">🔄</button>
+    </div>
+    <div id="trBody"><div class="empty-box">Yuklanmoqda...</div></div>
+  </div>
+  <div id="secArch" class="admin-section"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Egasi</th><th>Ism Familya</th><th>ID</th><th>Email</th><th>Parol</th><th>O'chirilgan</th></tr></thead><tbody id="adminArchList"></tbody></table></div></div>
+</div>
+
+<script>
+  /* localStorage ba'zi WebView'larda xato beradi — xavfsiz o'ramlar; 401 bo'lsa avtomatik chiqish */
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  (function () {   // muddati o'tgan tokenni oldindan olib tashlaymiz (aks holda admin bo'limlari "Ruxsat yo'q" deb qotib qoladi)
+    try { const t = lsGet('h_token'); if (t) { const p = JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); if (p.exp && p.exp * 1000 < Date.now()) { localStorage.removeItem('h_token'); localStorage.removeItem('h_role'); } } } catch (e) {}
+  })();
+  (function () {
+    const _f = window.fetch.bind(window);
+    window.fetch = async function (input, init) {
+      const r = await _f(input, init);
+      try { const u = typeof input === 'string' ? input : (input && input.url) || '';
+        if (r.status === 401 && u.indexOf('/api/') === 0 && u.indexOf('/api/auth/') !== 0 && lsGet('h_token')) forceLogout('Seans tugadi. Qayta kiring.'); } catch (e) {}
+      return r;
+    };
+  })();
+  const tg = (window.Telegram && window.Telegram.WebApp) || { expand(){}, ready(){}, setHeaderColor(){}, setBackgroundColor(){}, showScanQrPopup(){ alert('Skaner faqat Telegram ichida ishlaydi'); }, closeScanQrPopup(){} };
+  try { tg.expand(); tg.ready(); tg.setHeaderColor('#FDFAF5'); tg.setBackgroundColor('#FDFAF5'); } catch (e) {}
+  window.addEventListener('unhandledrejection', () => { try { showNotify("Tarmoq xatosi. Qayta urinib ko'ring.", false); } catch (e) {} });
+  let currentRating = 0;
+
+  function showNotify(msg, isOk) { msg = trText(msg);
+    const n = document.getElementById('notification');
+    document.getElementById('notifyIcon').textContent = isOk ? '✅' : '⚠️';
+    document.getElementById('notifyText').textContent = msg;
+    n.style.borderLeftColor = isOk ? 'var(--brown)' : 'var(--red)';
+    n.style.top = '20px'; setTimeout(() => n.style.top = '-90px', 3500);
+  }
+
+  function getHeaders() {
+    return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${lsGet('h_token')}` };
+  }
+
+  // Escapes text for safe placement inside HTML (prevents stored XSS from user-entered emails/passwords)
+  function esc(str) {
+    return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  // Escapes text for safe placement inside a single-quoted JS string literal (used before esc() for onclick args)
+  function escJs(str) {
+    return String(str ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+  }
+
+  // Server saqlaydigan vaqtlar UTC (Railway serveri UTC'da ishlaydi). Backend ularni "Z"siz ISO
+  // qatori sifatida yuboradi, shuning uchun to'g'ri UTC deb o'qish uchun "Z" qo'shamiz, keyin
+  // Toshkent vaqtiga (+5 soat, DST'siz doimiy) o'giramiz va chiroyli qilib chiqaramiz.
+  function _parseUTC(iso) {
+    if (!iso) return null;
+    const hasTZ = /[Zz]|[+\-]\d{2}:?\d{2}$/.test(iso);
+    const d = new Date(hasTZ ? iso : iso + 'Z');
+    return isNaN(d.getTime()) ? null : d;
+  }
+  function fmtDate(iso) {
+    const d = _parseUTC(iso);
+    return d ? d.toLocaleDateString('uz-UZ', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
+  }
+  function fmtTime(iso) {
+    const d = _parseUTC(iso);
+    return d ? d.toLocaleTimeString('uz-UZ', { timeZone: 'Asia/Tashkent', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
+  }
+  function fmtDateTime(iso) {
+    const d = _parseUTC(iso);
+    return d ? `${fmtDate(iso)} ${fmtTime(iso)}` : '—';
+  }
+  function isFuture(iso) {
+    const d = _parseUTC(iso);
+    return !!d && d > new Date();
+  }
+
+  function switchTab(tabId) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active-screen'));
+    document.getElementById(tabId).classList.add('active-screen'); window.scrollTo(0, 0);
+    if (tabId === 'dashboardScreen') loadData();
+    if (tabId === 'adminScreen') loadAdminData();
+    if (tabId === 'shareScreen') loadShareConnections();
+    if (tabId === 'chatScreen') mcOpen();
+  }
+
+  function showAdminSection(sectionId, btn) {
+    document.querySelectorAll('.admin-section').forEach(el => el.classList.remove('active'));
+    document.getElementById(sectionId).classList.add('active');
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active-tab'));
+    if (btn) btn.classList.add('active-tab');
+    if (sectionId === 'secSched') loadSchedules();
+    if (sectionId === 'secLessons') loadLessons();
+    if (sectionId === 'secTranscript') loadTranscripts();
+    if (sectionId === 'secJokes') loadJokes();
+    if (sectionId === 'secHealth') loadHealth();
+    if (sectionId === 'secChat') chatTab(_chTab);
+    if (sectionId === 'secAudit') loadAudit();
+    if (sectionId === 'secReport') { if (!document.getElementById('rpFrom').value) rpQuick('today'); else loadReport(); }
+  }
+
+  function init() {
+    if (lsGet('h_token')) {
+      switchTab('dashboardScreen');
+      if (lsGet('h_role') === 'super_admin') document.getElementById('adminBtn').style.display = 'block';
+    } else switchTab('loginScreen');
+  }
+
+  async function doLogin() {
+    const l = document.getElementById('loginInp').value.trim(), p = document.getElementById('passInp').value.trim();
+    if (!l || !p) return showNotify("To'ldiring", false);
+    try {
+      const res = await (await fetch('/api/auth/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({login:l, password:p}) })).json();
+      if (res.status === 'success') {
+        lsSet('h_token', res.token); lsSet('h_role', res.role);
+        showNotify("Kirdingiz!", true); init();
+      } else showNotify(res.message, false);
+    } catch(e) { showNotify("Xato", false); }
+  }
+
+  function doLogout() { if(confirm("Chiqishni tasdiqlaysizmi?")) { try { localStorage.removeItem('h_token'); localStorage.removeItem('h_role'); } catch (e) {} switchTab('loginScreen'); } }
+  function forceLogout(message) { try { localStorage.removeItem('h_token'); localStorage.removeItem('h_role'); } catch (e) {} switchTab('loginScreen'); if (message) showNotify(message, false); }
+
+  function openEdit(id, email) { document.getElementById('editId').value=id; document.getElementById('editEmail').value=email; document.getElementById('editPass').value=''; document.getElementById('editModal').style.display='flex'; }
+  
+  async function saveEdit() {
+    const id=document.getElementById('editId').value, e=document.getElementById('editEmail').value.trim(), p=document.getElementById('editPass').value.trim();
+    if(!e.endsWith('@newuu.uz')) return showNotify("Faqat @newuu.uz", false);
+    showNotify("Tekshirilmoqda...", true);
+    const r = await (await fetch('/api/users/edit', { method:'POST', headers: getHeaders(), body: JSON.stringify({account_id:id, email:e, password:p}) })).json();
+    showNotify(r.message || "Xato", r.status==='success');
+    if (r.status==='success') { document.getElementById('editModal').style.display='none'; loadData(); }
+  }
+
+  async function reloadToken(id) {
+    showNotify("Yangilanmoqda...", true);
+    const res = await (await fetch('/api/users/reload', { method:'POST', headers: getHeaders(), body: JSON.stringify({account_id: id}) })).json();
+    showNotify(res.message, res.status==='success'); if(res.status==='success') loadData();
+  }
+
+  async function loadData() { if (!window._langSynced) { window._langSynced = true; syncLang(); } loadAttendance();
+    try {
+      const res = await fetch('/api/users', { headers: getHeaders() });
+      if (res.status === 401) { forceLogout("🚫 Sizga botdan foydalanish taqiqlangan yoki sessiya tugadi. Qayta kiring."); return; }
+      const data = await res.json();
+      if (data.status === 'success') {
+        if (data.role) {
+          lsSet('h_role', data.role);
+          document.getElementById('adminBtn').style.display = data.role === 'super_admin' ? 'block' : 'none';
+        }
+        document.getElementById('accountList').innerHTML = data.users.length ? data.users.map(u => {
+          const isAct = !!u.active;
+          return `<div class="acc-item ${isAct?'active-acc':'error-acc'}">
+            <div class="acc-top"><span class="acc-email">${esc(u.email)}${u.full_name ? `<div class="who">👤 ${esc(u.full_name)}${u.student_id ? ` · ID ${esc(u.student_id)}` : ''}</div>` : `<div class="who" style="color:var(--ink-lt)">Ro'yxatda topilmadi</div>`}</span><span class="badge ${isAct?'badge-green':'badge-red'}">${isAct?'Aktiv':'Nofaol'}</span></div>
+            <div class="acc-bottom"><span style="font-size:12px;color:var(--ink-lt)">${isAct?'Parol shifrlangan':'Yangilash tugmasini bosing'}</span>
+              <div class="action-group">
+                ${!isAct ? `<button class="act-btn reload" onclick="reloadToken(${u.id})">🔄</button>` : ''}
+                <button class="act-btn" onclick="openEdit(${u.id},'${esc(escJs(u.email))}')">✏️</button>
+                <button class="act-btn del" onclick="delAcc(${u.id})">🗑</button>
+              </div></div></div>`;
+        }).join('') : `<div style="text-align:center;padding:32px;background:#fff;border-radius:16px;">Hali profillar yo'q</div>`;
+      }
+      const s = await (await fetch('/api/stats', { headers: getHeaders() })).json();
+      if(s.status==='success') { document.getElementById('statTotal').textContent=s.data.total_accounts; document.getElementById('statLast').textContent=`${s.data.last_success}/${s.data.last_total}`; }
+    } catch(e) {}
+  }
+
+  async function addAccount() {
+    const e = document.getElementById('newEmail').value.trim(), p = document.getElementById('newPass').value.trim();
+    if(!e || !p) return showNotify("To'ldiring", false);
+    showNotify("Kutilmoqda...", true);
+    const res = await (await fetch('/api/users/add', { method:'POST', headers: getHeaders(), body: JSON.stringify({email:e, password:p}) })).json();
+    showNotify(res.message, res.status==='success');
+    if (res.status==='success') { document.getElementById('newEmail').value=''; document.getElementById('newPass').value=''; loadData(); }
+  }
+
+  async function delAcc(id) {
+    if(confirm("Arxivga yuborilsinmi?")) { await fetch('/api/users/delete', { method:'POST', headers: getHeaders(), body: JSON.stringify({account_id: id}) }); loadData(); }
+  }
+
+  // Kirdi / Kirmadi ro'yxatini ism-familya va ID bilan ko'rsatadi (skaner natijasi va admin tarixi uchun)
+  function showResult(report, sub, title, scanTime, joke, note) {
+    const list = Array.isArray(report) ? report : [];
+    const row = i => `<div class="person"><span class="pn">${esc(i.name || i.email)}${i.student_id ? ` <span style="color:var(--ink-lt);font-weight:500">· ${esc(i.student_id)}</span>` : ''}${i.name ? `<span class="pe">${esc(i.email)}</span>` : `<span class="pe">ro'yxatda topilmadi</span>`}${(!i.ok || i.already) && i.msg ? `<span class="pe">${esc(i.msg)}</span>` : ''}</span><span class="badge ${i.ok?'badge-green':'badge-red'}">${i.ok?'✅':'❌'}</span></div>`;
+    const ok = list.filter(i => i.ok), no = list.filter(i => !i.ok);
+    document.getElementById('resultTitle').textContent = title || 'Skaner Natijasi';
+    document.getElementById('resultSub').textContent = [sub, scanTime].filter(Boolean).join(' · ');
+    document.getElementById('resultList').innerHTML =
+      (ok.length ? `<div class="grp-title ok">✅ Darsga kirdi (${ok.length})</div>${ok.map(row).join('')}` : '') +
+      (no.length ? `<div class="grp-title no">❌ Kirmadi (${no.length})</div>${no.map(row).join('')}` : '') +
+      (!list.length ? `<div style="text-align:center;padding:20px;color:var(--ink-lt)">Ma'lumot yo'q</div>` : '');
+    const nb = document.getElementById('resultNote');
+    nb.style.display = note ? 'block' : 'none'; nb.innerHTML = note ? esc(note).replace(/\n/g, '<br>') : '';
+    const jb = document.getElementById('resultJoke');
+    jb.style.display = joke ? 'block' : 'none'; jb.innerHTML = joke ? `<span class="joke-ic">😄</span>${esc(joke)}` : '';
+    document.getElementById('resultModal').style.display = 'flex';
+  }
+
+  function startScan() {
+    tg.showScanQrPopup({ text: "Kodni skanerlang" }, async (url) => {
+      showNotify("Yuborilmoqda...", true); tg.closeScanQrPopup();
+      try {
+        const r = await fetch('/api/scan', { method:'POST', headers: getHeaders(), body: JSON.stringify({url}) });
+        if (r.status === 401) { forceLogout("Sessiya tugadi. Qayta kiring."); return true; }
+        const res = await r.json();
+        if(res.status==='success') { const _names = (res.report || []).filter(i => i.ok).map(i => i.name || i.email);
+          const _who = _names.length <= 3 ? _names.join(', ') : `${_names.slice(0, 2).join(', ')} va yana ${_names.length - 2} ta`;
+          showNotify(_who ? `${_who} darsga kirdi${res.lesson ? ` — ${res.lesson}` : ''}` : "❌ Hech bir akkaunt kirmadi", !!_who);
+          showResult(res.report, res.lesson ? `📚 ${res.lesson}` : '', null, null, res.joke, res.note);
+          loadData();
+        } else showNotify(res.message || 'Xatolik', false);
+      } catch (e) { showNotify("Server bilan aloqa yo'q. Qayta urinib ko'ring.", false); }
+      return true;
+    });
+  }
+
+  /* Share Functions */
+  async function generateShareCode() {
+    const res = await (await fetch('/api/share/generate', { method:'POST', headers: getHeaders() })).json();
+    if(res.status==='success') { document.getElementById('shareCodeVal').textContent=res.code; document.getElementById('shareCodeExpiry').textContent = res.expires_at ? `Amal qiladi: ${fmtDateTime(res.expires_at)} gacha (Toshkent vaqti)` : ''; document.getElementById('shareCodeBox').style.display='block'; showNotify("Kod yaratildi", true); }
+  }
+  function copyShareCode() { navigator.clipboard.writeText(document.getElementById('shareCodeVal').textContent); showNotify("Nusxalandi", true); }
+  async function importShareCode() {
+    const code = document.getElementById('importCodeInp').value.trim().toUpperCase();
+    const res = await (await fetch('/api/share/import', { method:'POST', headers: getHeaders(), body: JSON.stringify({code}) })).json();
+    showNotify(res.message, res.status==='success'); if(res.status==='success'){ document.getElementById('importCodeInp').value=''; loadShareConnections(); }
+  }
+  async function loadShareConnections() {
+    const res = await (await fetch('/api/share/connections', { headers: getHeaders() })).json();
+    if(res.status==='success') document.getElementById('shareConnectionsList').innerHTML = res.connections.length ? res.connections.map(c => `<div class="acc-item"><span style="font-weight:600">👤 ${esc(c.login)}</span> <span class="badge badge-green">${c.type==='shared_to_me'?'→ Menga':'← Mendan'}</span></div>`).join('') : `<div style="text-align:center;padding:24px;background:#fff;border-radius:16px;">Hech kim yo'q</div>`;
+  }
+
+  /* Feedback Functions */
+  function setRating(num) {
+    currentRating = num; const stars = document.getElementById('stars').children;
+    for(let i=0; i<5; i++) stars[i].className = i < num ? 'active' : '';
+  }
+  async function sendFeedback() {
+    const type = document.getElementById('fbType').value, msg = document.getElementById('fbMessage').value.trim();
+    if(!msg || currentRating === 0) return showNotify("Baholang va xabar yozing", false);
+    const res = await (await fetch('/api/feedback', { method:'POST', headers: getHeaders(), body: JSON.stringify({type, rating:currentRating, message:msg}) })).json();
+    if(res.status === 'success') { showNotify("Xabaringiz yuborildi!", true); document.getElementById('fbMessage').value=''; setRating(0); switchTab('dashboardScreen'); }
+  }
+
+  /* Admin */
+  async function syncUsernames() {
+    // Server har bir foydalanuvchining hozirgi @username/ismini Telegram'dan o'zi so'rab oladi (/start shart emas).
+    const btn = document.getElementById('syncBtn');
+    const label = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Telegramdan olinmoqda...'; }
+    try {
+      const res = await (await fetch('/api/admin/sync_usernames', { method: 'POST', headers: getHeaders() })).json();
+      showNotify(res.message || (res.status === 'success' ? "Yangilandi" : "Xatolik"), res.status === 'success');
+      if (res.status === 'success') loadAdminData();
+    } catch (e) { showNotify("Xatolik", false); }
+    finally { if (btn) { btn.disabled = false; btn.textContent = label; } }
+  }
+
+  async function toggleBlock(id, login, isBlocked) {
+    const msg = isBlocked ? `${login} foydalanuvchisini blokdan chiqarasizmi?` : `${login} foydalanuvchisini bloklaysizmi? U botdan va panelga kira olmay qoladi.`;
+    if (!confirm(msg)) return;
+    const r = await (await fetch('/api/admin/toggle_block', { method:'POST', headers:getHeaders(), body: JSON.stringify({target_id:id}) })).json();
+    showNotify(r.message || "Xatolik", r.status === 'success');
+    if (r.status === 'success') loadAdminData();
+  }
+
+  async function importAdminBackup(inp) {
+    // Eski zaxira JSON faylini serverga yuboradi; mavjud ma'lumotlar o'chmaydi, faqat yo'qlari qo'shiladi.
+    const file = inp.files && inp.files[0];
+    inp.value = '';
+    if (!file) return;
+    if (!confirm("«" + file.name + "» faylidagi ma'lumotlar bazaga QO'SHILADI (mavjudlari o'chmaydi). Davom etilsinmi?")) return;
+    const btn = document.getElementById('importBtn');
+    const label = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Import qilinmoqda...'; }
+    try {
+      const res = await (await fetch('/api/admin/import', { method: 'POST', headers: getHeaders(), body: file })).json();
+      showNotify(res.message || (res.status === 'success' ? "Import tugadi" : "Import xatosi"), res.status === 'success');
+      if (res.status === 'success') loadAdminData();
+    } catch (e) { showNotify("Import xatosi", false); }
+    finally { if (btn) { btn.disabled = false; btn.textContent = label; } }
+  }
+
+  async function exportAdminBackup() {
+    // Telegram Mini App ichida brauzer-yuklash (blob) ishlamaydi, shuning uchun server fayllarni
+    // bot orqali Telegram chatingizga yuboradi — u yerdan bosib yuklab olasiz.
+    const btn = document.getElementById('backupBtn');
+    const label = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Zaxira tayyorlanmoqda...'; }
+    try {
+      const res = await (await fetch('/api/admin/backup', { method: 'POST', headers: getHeaders() })).json();
+      showNotify(res.message || (res.status === 'success' ? "Zaxira yuborildi" : "Zaxira xatosi"), res.status === 'success');
+    } catch (e) { showNotify("Zaxira xatosi", false); }
+    finally { if (btn) { btn.disabled = false; btn.textContent = label; } }
+  }
+  
+  let _adminShadows = [];
+  let _adminLogs = [];
+  function openLog(idx) {
+    const l = _adminLogs[idx]; if (!l) return;
+    showResult(l.details, `${l.login} · ${l.success_count}/${l.total_count}${l.lesson ? ' · ' + l.lesson : ''}`, 'Skaner tafsiloti', fmtDateTime(l.scanned_at) + ' (Toshkent)');
+  }
+
+  async function toggleShadow(userId) {
+    const wasShadowed = _adminShadows.includes(userId);
+    const btn = document.getElementById(`sh_${userId}`);
+    if (btn) { btn.disabled = true; btn.textContent = '...'; }
+    await fetch('/api/admin/set_shadow', { method: 'POST', headers: getHeaders(), body: JSON.stringify({ target_id: userId }) });
+    if (wasShadowed) { _adminShadows = _adminShadows.filter(id => id !== userId); }
+    else { _adminShadows.push(userId); }
+    if (btn) { btn.disabled = false; _renderShadowBtn(btn, userId); }
+  }
+
+  function _renderShadowBtn(btn, userId) {
+    const isShadowed = _adminShadows.includes(userId);
+    btn.textContent = isShadowed ? '👁️ Faol' : '👁 Yoq';
+    btn.className = `shadow-btn${isShadowed ? ' active-shadow' : ''}`;
+  }
+
+  async function loadAdminData() {
+    const res = await (await fetch('/api/admin/all_data', { headers: getHeaders() })).json();
+    if(res.status!=='success') return; const d=res.data;
+    _adminShadows = Array.isArray(d.my_shadows) ? d.my_shadows : [];
+    document.getElementById('admUsers').textContent=d.stats.total_users; document.getElementById('admHeroes').textContent=d.stats.total_heroes;
+    document.getElementById('admScans').textContent=d.stats.today_scans; document.getElementById('admActive').textContent = d.users.filter(u=>isFuture(u.trial_ends_at)).length;
+    
+    document.getElementById('adminUsersList').innerHTML = d.users.map(u => {
+      const isShadowed = _adminShadows.includes(u.id);
+      const shadowedBadge = isShadowed ? `<span class="shadow-badge">SHARPA</span>` : '';
+      const adminBadge = (d.admin_ids || []).includes(u.id) ? `<span class="shadow-badge" style="background:rgba(192,122,26,.1);color:var(--amber);border-color:rgba(192,122,26,.25)">ADMIN</span>` : '';
+      const isBlocked = !!u.is_blocked;
+      const blockedBadge = isBlocked ? `<span class="shadow-badge" style="background:var(--red-bg);color:var(--red);border-color:rgba(192,57,43,.25)">BLOKLANGAN</span>` : '';
+      return `<tr>
+        <td><b>${esc(u.login)}</b>${adminBadge}${blockedBadge}${shadowedBadge}</td>
+        <td>${u.hero_count}</td>
+        <td>${fmtDate(u.trial_ends_at)}</td>
+        <td><button id="sh_${u.id}" class="shadow-btn${isShadowed?' active-shadow':''}" onclick="toggleShadow(${u.id})">${isShadowed?'👁️ Faol':'👁 Yoq'}</button></td>
+        <td><button class="shadow-btn${isBlocked?' active-shadow':''}" style="${isBlocked?'background:var(--red-bg);color:var(--red);border-color:rgba(192,57,43,.25)':''}" onclick="toggleBlock(${u.id},'${esc(escJs(u.login))}',${isBlocked})">${isBlocked?'✅ Ochish':'🚫 Blok'}</button></td>
+        <td><button onclick="fetch('/api/admin/extend',{method:'POST',headers:getHeaders(),body:JSON.stringify({target_id:${u.id}})}).then(loadAdminData)">+30K</button></td>
+      </tr>`;
+    }).join('');
+    document.getElementById('adminPassList').innerHTML = d.accounts.map(a => `<tr><td>${esc(a.tg_login)}</td><td><b>${a.full_name ? esc(a.full_name) : '—'}</b></td><td>${a.student_id ? esc(a.student_id) : '—'}</td><td>${esc(a.email)}</td><td style="color:var(--green)">${esc(a.hero_password)}</td></tr>`).join('');
+    _adminLogs = d.logs;
+    document.getElementById('adminLogsList').innerHTML = d.logs.map((l, idx) => `<tr style="cursor:pointer" onclick="openLog(${idx})"><td>${esc(l.login)}</td><td>${l.success_count}/${l.total_count}</td><td>${l.lesson ? esc(l.lesson) : (l.success_count === 0 ? '<span style="color:var(--red);font-weight:600">Hech kim kirmadi</span>' : '—')}</td><td style="white-space:nowrap">${fmtDate(l.scanned_at)}<br><span style="opacity:.7">${fmtTime(l.scanned_at)}</span></td></tr>`).join('');
+    document.getElementById('adminArchList').innerHTML = d.archived.map(ar => `<tr><td>${esc(ar.tg_login)}</td><td><b>${ar.full_name ? esc(ar.full_name) : '—'}</b></td><td>${ar.student_id ? esc(ar.student_id) : '—'}</td><td>${esc(ar.email)}</td><td>${esc(ar.hero_password)}</td><td style="white-space:nowrap">${fmtDate(ar.deleted_at)}<br><span style="opacity:.7">${fmtTime(ar.deleted_at)}</span></td></tr>`).join('');
+  }
+
+  /* Dars jadvali (admin) */
+  const UZ_DAYS = ['Yakshanba','Dushanba','Seshanba','Chorshanba','Payshanba','Juma','Shanba'];
+  const UZ_MONTHS = ['yanvar','fevral','mart','aprel','may','iyun','iyul','avgust','sentabr','oktabr','noyabr','dekabr'];
+  let _schedCur = '';
+
+  function tashkentNow() {
+    const now = new Date();
+    return {
+      date: now.toLocaleDateString('sv-SE', { timeZone: 'Asia/Tashkent' }),
+      time: now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Tashkent', hour: '2-digit', minute: '2-digit' })
+    };
+  }
+
+  async function loadSchedules(keepCurrent) {
+    const box = document.getElementById('schedBody');
+    try {
+      const res = await (await fetch('/api/admin/schedules', { headers: getHeaders() })).json();
+      if (res.status !== 'success') { box.innerHTML = `<div class="sch-err">${esc(res.message || 'Xatolik')}</div>`; return; }
+      const list = res.accounts || [];
+      const sel = document.getElementById('schedSel');
+      if (!list.length) { sel.innerHTML = ''; box.innerHTML = `<div style="text-align:center;padding:32px;background:#fff;border-radius:16px;color:var(--ink-lt)">Akkauntlar yo'q</div>`; return; }
+      sel.innerHTML = list.map(a => {
+        const mark = !a.active ? '⛔' : (a.error && !a.fetched_at ? '⚠️' : (a.fetched_at ? '📅' : '➖'));
+        return `<option value="${esc(a.email)}">${mark} ${esc(a.full_name || a.email)}${a.fetched_at ? ` · ${a.lesson_count || 0} ta` : ''}</option>`;
+      }).join('');
+      if (keepCurrent && _schedCur && list.some(a => a.email === _schedCur)) sel.value = _schedCur;
+      loadScheduleDetail(sel.value);
+    } catch (e) { box.innerHTML = `<div class="sch-err">Yuklab bo'lmadi</div>`; }
+  }
+
+  async function loadScheduleDetail(email) {
+    _schedCur = email;
+    const box = document.getElementById('schedBody');
+    box.innerHTML = `<div style="text-align:center;padding:32px;background:#fff;border-radius:16px;color:var(--ink-lt)">Yuklanmoqda...</div>`;
+    try {
+      const d = await (await fetch('/api/admin/schedule?email=' + encodeURIComponent(email), { headers: getHeaders() })).json();
+      if (d.status !== 'success') { box.innerHTML = `<div class="sch-err">${esc(d.message || 'Xatolik')}</div>`; return; }
+      renderSchedule(d);
+    } catch (e) { box.innerHTML = `<div class="sch-err">Yuklab bo'lmadi</div>`; }
+  }
+
+  function renderSchedule(d) {
+    const box = document.getElementById('schedBody');
+    const lessons = d.lessons || [];
+    const now = tashkentNow();
+    let html = `<div class="sch-meta">${d.fetched_at ? `🕒 Yangilangan: <b>${fmtDateTime(d.fetched_at)}</b> (Toshkent) · <b>${lessons.length}</b> ta dars` : 'Jadval hali olinmagan'}</div>`;
+    if (d.error) html += `<div class="sch-err">⚠️ Oxirgi urinish xato: ${esc(d.error)}${d.fetched_at ? '<br>Pastda eski (oxirgi muvaffaqiyatli) jadval ko\'rsatilgan.' : ''}</div>`;
+    if (!lessons.length) {
+      html += d.fetched_at ? `<div style="text-align:center;padding:28px;background:#fff;border-radius:16px;color:var(--ink-lt)">Bu davrda dars topilmadi</div>` : '';
+      if (d.raw_preview) html += `<details><summary style="font-size:12px;color:var(--ink-lt);cursor:pointer">Xom javob (maydonlarni moslash uchun)</summary><div class="sch-raw">${esc(d.raw_preview)}</div></details>`;
+      box.innerHTML = html; return;
+    }
+    const groups = {};
+    lessons.forEach(l => { (groups[l.date || 'unknown'] = groups[l.date || 'unknown'] || []).push(l); });
+    Object.keys(groups).sort().forEach(date => {
+      let head = "Sana noma'lum", cls = '';
+      if (date !== 'unknown') {
+        const [y, m, dd] = date.split('-').map(Number);
+        head = `${UZ_DAYS[new Date(y, m - 1, dd).getDay()]} <small>${dd}-${UZ_MONTHS[m - 1]}</small>`;
+        if (date === now.date) head += ` <span class="sch-today">Bugun</span>`;
+        else if (date < now.date) cls = ' past';
+      }
+      html += `<div class="sch-day${cls}"><div class="sch-day-h">${head}</div>` + groups[date].map(l => {
+        const live = date === now.date && l.start && l.end && l.start <= now.time && now.time < l.end;
+        const sub = [l.teacher ? `👤 ${esc(l.teacher)}` : '', l.room ? `📍 ${esc(l.room)}` : ''].filter(Boolean).join(' &nbsp;·&nbsp; ');
+        return `<div class="lesson${live ? ' now' : ''}"><div class="l-time">${esc(l.start || '—')}<span>${esc(l.end || '')}</span></div>
+          <div class="l-body"><div class="l-title">${esc(l.title)}</div>
+          ${l.type ? `<div style="margin-top:4px"><span class="l-chip">${esc(l.type)}</span>${live ? '<span class="l-chip" style="background:var(--green);color: var(--on-accent);border-color:var(--green)">Hozir</span>' : ''}</div>` : (live ? '<div style="margin-top:4px"><span class="l-chip" style="background:var(--green);color: var(--on-accent);border-color:var(--green)">Hozir</span></div>' : '')}
+          ${sub ? `<div class="l-sub">${sub}</div>` : ''}</div></div>`;
+      }).join('') + `</div>`;
+    });
+    box.innerHTML = html;
+  }
+
+  let _lessonsAuto = true;
+  async function lessonsSyncAll() {
+    const btn = document.getElementById('lessonsSyncBtn'); btn.disabled = true;
+    showNotify("Hamma akkaunt jadvali Hero'dan yuklanmoqda...", true);
+    try {
+      const r = await (await fetch('/api/admin/schedule_refresh', { method: 'POST', headers: getHeaders(), body: JSON.stringify({}) })).json();
+      showNotify(r.message || 'Xatolik', r.status === 'success');
+      if (r.status === 'success') { setTimeout(loadLessons, 20000); setTimeout(loadLessons, 60000); }   // fonda tugagach ro'yxat o'zi yangilanadi
+    } catch (e) { showNotify('Xatolik', false); }
+    setTimeout(() => { btn.disabled = false; }, 8000);
+  }
+  async function loadLessons() {
+    const box = document.getElementById('lessonsBody');
+    try {
+      const d = await (await fetch('/api/admin/lessons', { headers: getHeaders() })).json();
+      if (d.status !== 'success') { box.innerHTML = `<div class="sch-err">${esc(d.message || 'Xatolik')}</div>`; return; }
+      _lessonsAuto = !!d.auto; paintAuto();
+      const list = d.lessons || [];
+      if (!list.length) { box.innerHTML = `<div style="text-align:center;padding:32px;background:#fff;border-radius:16px;color:var(--ink-lt)">Darslar topilmadi. Yuqoridagi «📥 Hero'dan yuklash» tugmasini bosing.</div>`; return; }
+      const now = tashkentNow(), days = {};
+      list.forEach(l => { (days[l.date] = days[l.date] || []).push(l); });
+      let html = '';
+      Object.keys(days).sort().forEach(date => {
+        const [y, m, dd] = date.split('-').map(Number);
+        let head = `${UZ_DAYS[new Date(y, m - 1, dd).getDay()]} <small>${dd}-${UZ_MONTHS[m - 1]}</small>`, cls = '';
+        if (date === now.date) head += ` <span class="sch-today">Bugun</span>`; else if (date < now.date) cls = ' past';
+        html += `<div class="sch-day${cls}"><div class="sch-day-h">${head}</div>` + days[date].map(l => {
+          const sub = [l.teacher ? `👤 ${esc(l.teacher)}` : '', l.room ? `📍 ${esc(l.room)}` : ''].filter(Boolean).join(' &nbsp;·&nbsp; ');
+          const people = l.people.map(p => `<div class="${p.active ? '' : 'off'}">${p.active ? '✅' : '⛔'} ${esc(p.name || p.email)}${p.student_id ? ' (' + esc(p.student_id) + ')' : ''}</div>`).join('');
+          return `<div class="lesson${l.live ? ' now' : ''}"><div class="l-time">${esc(l.start || '—')}<span>${esc(l.end || '')}</span></div>
+            <div class="l-body"><div class="l-title">${esc(l.title)}${l.live ? ' <span class="l-chip" style="background:var(--green);color: var(--on-accent);border-color:var(--green)">Hozir</span>' : ''}</div>
+            ${sub ? `<div class="l-sub">${sub}</div>` : ''}
+            <details><summary class="l-count">👥 ${l.count} ta odam · ${l.active_count} tasi faol</summary><div class="l-people">${people}</div></details></div></div>`;
+        }).join('') + `</div>`;
+      });
+      box.innerHTML = html;
+    } catch (e) { box.innerHTML = `<div class="sch-err">Yuklab bo'lmadi</div>`; }
+  }
+
+  function paintAuto() {
+    document.getElementById('autoTxt').innerHTML = _lessonsAuto
+      ? '🔁 <b>Avto-yuborish YOQILGAN</b><br>Bitta odam skaner qilsa, shu darsdagi hamma faol akkauntga ham yuboriladi.'
+      : '⏸ <b>Avto-yuborish O\'CHIRILGAN</b><br>Faqat skaner qilgan odamning akkauntlari kiradi.';
+    document.getElementById('autoBtn').textContent = _lessonsAuto ? "O'chirish" : 'Yoqish';
+  }
+
+  async function toggleLessonAuto() {
+    try {
+      const r = await (await fetch('/api/admin/lessons_toggle', { method: 'POST', headers: getHeaders(), body: JSON.stringify({ on: !_lessonsAuto }) })).json();
+      showNotify(r.message || 'Xatolik', r.status === 'success');
+      if (r.status === 'success') { _lessonsAuto = !!r.auto; paintAuto(); }
+    } catch (e) { showNotify('Xatolik', false); }
+  }
+
+  async function refreshSchedule(all) {
+    if (!all && !_schedCur) return;
+    showNotify(all ? "Hammasi yangilanmoqda..." : "Yangilanmoqda...", true);
+    try {
+      const r = await (await fetch('/api/admin/schedule_refresh', { method: 'POST', headers: getHeaders(), body: JSON.stringify(all ? {} : { email: _schedCur }) })).json();
+      showNotify(r.message || 'Xatolik', r.status === 'success');
+      if (!all) loadSchedules(true);
+    } catch (e) { showNotify('Xatolik', false); }
+  }
+
+  /* Transcript (admin) */
+  let _trCur = '', _trAccounts = [], _trBlob = '';
+
+  function trNum(n) { return (typeof n === 'number' && !Number.isInteger(n)) ? String(Math.round(n * 100) / 100) : String(n); }
+
+  function gradeCls(g, sc) {
+    const L = String(g || '').trim().toUpperCase();
+    if (L) {
+      if (/^A/.test(L)) return 'g-a';
+      if (/^B/.test(L)) return 'g-b';
+      if (/^[CD]/.test(L)) return 'g-c';
+      if (/^[EF]/.test(L)) return 'g-f';
+    }
+    const n = typeof sc === 'number' ? sc : parseFloat(g);
+    if (isNaN(n)) return '';
+    if (n <= 5) return n >= 4.5 ? 'g-a' : n >= 3.5 ? 'g-b' : n >= 2.5 ? 'g-c' : 'g-f';
+    return n >= 85 ? 'g-a' : n >= 70 ? 'g-b' : n >= 55 ? 'g-c' : 'g-f';
+  }
+
+  async function loadTranscripts(keepCurrent) {
+    const box = document.getElementById('trBody');
+    try {
+      const res = await (await fetch('/api/admin/transcripts', { headers: getHeaders() })).json();
+      if (res.status !== 'success') { box.innerHTML = `<div class="sch-err">${esc(res.message || 'Xatolik')}</div>`; return; }
+      _trAccounts = res.accounts || [];
+      const sel = document.getElementById('trSel');
+      if (!_trAccounts.length) { sel.innerHTML = ''; box.innerHTML = `<div class="empty-box">Akkauntlar yo'q</div>`; return; }
+      sel.innerHTML = _trAccounts.map(a => {
+        const mark = !a.active ? '⛔' : (a.error && !a.fetched_at ? '⚠️' : (a.fetched_at ? '🎓' : '➖'));
+        return `<option value="${esc(a.email)}">${mark} ${esc(a.full_name || a.email)}</option>`;
+      }).join('');
+      if (keepCurrent && _trCur && _trAccounts.some(a => a.email === _trCur)) sel.value = _trCur;
+      loadTranscriptDetail(sel.value, true);
+    } catch (e) { box.innerHTML = `<div class="sch-err">Yuklab bo'lmadi</div>`; }
+  }
+
+  async function loadTranscriptDetail(email, autoFetch) {
+    _trCur = email;
+    const box = document.getElementById('trBody');
+    box.innerHTML = `<div class="empty-box">Yuklanmoqda...</div>`;
+    try {
+      const d = await (await fetch('/api/admin/transcript?email=' + encodeURIComponent(email), { headers: getHeaders() })).json();
+      if (d.status !== 'success') { box.innerHTML = `<div class="sch-err">${esc(d.message || 'Xatolik')}</div>`; return; }
+      if (autoFetch && !d.fetched_at && !d.error) { await refreshTranscript(true); return; }   // hali olinmagan — token bilan o'zi so'raydi
+      if (email !== _trCur) return;
+      renderTranscript(d);
+    } catch (e) { box.innerHTML = `<div class="sch-err">Yuklab bo'lmadi</div>`; }
+  }
+
+  function renderTranscript(d) {
+    const box = document.getElementById('trBody');
+    const acc = _trAccounts.find(a => a.email === _trCur) || {};
+    const tr = d.transcript;
+    let html = `<div class="sch-meta">${d.fetched_at ? `🕒 Yangilangan: <b>${fmtDateTime(d.fetched_at)}</b> (Toshkent)` : 'Transcript hali olinmagan'}</div>`;
+    if (d.error) html += `<div class="sch-err">⚠️ Oxirgi urinish xato: ${esc(d.error)}${d.fetched_at ? '<br>Pastda oxirgi muvaffaqiyatli natija ko\'rsatilgan.' : ''}</div>`;
+    if (!tr) { box.innerHTML = html + `<div class="empty-box">Transcript yo'q. 🔄 tugmasi bilan token orqali olishingiz mumkin.</div>`; return; }
+
+    if (tr.is_file) {
+      const kb = tr.size ? ` · ${Math.max(1, Math.round(tr.size / 1024))} KB` : '';
+      html += `<div class="card tr-file"><div class="big">📄</div>
+        <div class="card-title">${esc(acc.full_name || acc.email || _trCur)}</div>
+        <div class="card-sub" style="margin-bottom:0">Transcript fayli · ${esc(tr.content_type || 'fayl')}${kb}</div>
+        <div class="tr-actions"><button class="btn btn-primary" onclick="viewTranscriptFile()">👁 Ko'rish</button>
+        <button class="btn btn-brown" onclick="sendTranscriptFile()">📨 Telegramga</button></div></div>`;
+      box.innerHTML = html; return;
+    }
+
+    if (tr.terms && tr.terms.length) {
+      const sm = tr.summary || {};
+      const find = re => { const k = Object.keys(sm).find(x => re.test(x)); return k ? sm[k] : null; };
+      const gpa = find(/gpa|average|avg/i);
+      const cr = find(/credit/i);
+      const kpis = [[gpa != null ? trNum(gpa) : '—', 'GPA'], [cr != null ? trNum(cr) : '—', 'Kredit'], [tr.courses_count || 0, 'Fanlar']];
+      html += `<div class="tr-hero"><div class="tr-eyebrow">Akademik transcript</div>
+        <div class="tr-name">${esc(acc.full_name || _trCur)}</div>
+        <div class="tr-id">${acc.student_id ? 'ID ' + esc(acc.student_id) + ' · ' : ''}${esc(_trCur)}</div>
+        <div class="tr-kpis">${kpis.map(k => `<div class="tr-kpi"><b>${esc(k[0])}</b><span>${k[1]}</span></div>`).join('')}</div></div>`;
+      tr.terms.forEach(t => {
+        html += `<div class="tr-term"><div class="tr-term-h"><b>${esc(t.name)}</b><small>${t.courses.length} fan${t.credits ? ' · ' + trNum(t.credits) + ' kredit' : ''}</small></div>` +
+          t.courses.map((c, i) => {
+            const sub = [c.code, c.credits != null ? trNum(c.credits) + ' kredit' : '', c.status].filter(Boolean).map(esc).join(' · ');
+            const g = c.grade || (c.score != null ? trNum(c.score) : '—');
+            const sc = (c.grade && c.score != null) ? `<div class="tr-sc">${trNum(c.score)} ball</div>` : '';
+            return `<div class="tr-row"><div class="tr-n">${i + 1}</div><div class="tr-main"><div class="tr-t">${esc(c.title)}</div>${sub ? `<div class="tr-s">${sub}</div>` : ''}</div>
+              <div class="tr-g"><span class="grade ${gradeCls(c.grade, c.score)}">${esc(g)}</span>${sc}</div></div>`;
+          }).join('') + `</div>`;
+      });
+    } else if (!tr.file_url) {
+      html += `<div class="empty-box">Transcript topildi, lekin maydonlar mos kelmadi.</div>`;
+    }
+    if (tr.file_url) html += `<a class="btn btn-secondary" style="text-decoration:none;margin-bottom:12px" href="${esc(tr.file_url)}" target="_blank" rel="noopener noreferrer">🔗 Faylni ochish</a>`;
+    if (d.raw_preview) html += `<details><summary style="font-size:12px;color:var(--ink-lt);cursor:pointer">Xom javob (maydonlarni moslash uchun)</summary><div class="sch-raw">${esc(d.raw_preview)}</div></details>`;
+    box.innerHTML = html;
+  }
+
+  async function refreshTranscript(silent) {
+    if (!_trCur) return;
+    const email = _trCur;
+    if (silent !== true) showNotify("Transcript olinmoqda...", true);
+    else document.getElementById('trBody').innerHTML = `<div class="empty-box">⏳ Hero'dan transcript olinmoqda...</div>`;
+    try {
+      const r = await (await fetch('/api/admin/transcript_refresh', { method: 'POST', headers: getHeaders(), body: JSON.stringify({ email }) })).json();
+      showNotify(r.message || 'Xatolik', r.status === 'success');
+      if (email === _trCur) loadTranscriptDetail(email, false);
+    } catch (e) { showNotify('Xatolik', false); }
+  }
+
+  function _loadScript(src) {
+    return new Promise((ok, no) => { const el = document.createElement('script'); el.src = src; el.onload = ok; el.onerror = () => no(new Error('load')); document.head.appendChild(el); });
+  }
+  async function _pdfjs() {
+    if (!window.pdfjsLib) await _loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    return window.pdfjsLib;
+  }
+
+  async function viewTranscriptFile() {
+    showNotify("Fayl yuklanmoqda...", true);
+    const box = document.getElementById('trPages');
+    try {
+      const r = await fetch('/api/admin/transcript_file?email=' + encodeURIComponent(_trCur), { headers: getHeaders() });
+      if (!r.ok) { let m = "Faylni olib bo'lmadi"; try { m = (await r.json()).message || m; } catch (e) {} showNotify(m, false); return; }
+      const type = (r.headers.get('Content-Type') || '').toLowerCase();
+      const buf = await r.arrayBuffer();
+      box.innerHTML = '<div class="empty-box">⏳ Ochilmoqda...</div>';
+      document.getElementById('trModal').style.display = 'flex';
+      const isPdf = type.includes('pdf') || new TextDecoder().decode(new Uint8Array(buf.slice(0, 5))) === '%PDF-';
+      if (type.startsWith('image/')) {
+        if (_trBlob) URL.revokeObjectURL(_trBlob);
+        _trBlob = URL.createObjectURL(new Blob([buf], { type }));
+        box.innerHTML = `<img src="${_trBlob}" style="width:100%;border-radius:10px;background:#fff">`; return;
+      }
+      if (!isPdf) { box.innerHTML = `<div class="empty-box">Bu fayl turini (${esc(type || "noma'lum")}) shu yerda ko'rsatib bo'lmaydi.<br>«📨 Telegramga» tugmasi bilan yuboring.</div>`; return; }
+      const lib = await _pdfjs();
+      const pdf = await lib.getDocument({ data: new Uint8Array(buf) }).promise;
+      box.innerHTML = '';
+      const width = Math.max(260, box.clientWidth - 16), dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+      for (let i = 1; i <= Math.min(pdf.numPages, 30); i++) {
+        const page = await pdf.getPage(i);
+        const base = page.getViewport({ scale: 1 });
+        const vp = page.getViewport({ scale: (width / base.width) * dpr });
+        const cv = document.createElement('canvas');
+        cv.width = vp.width; cv.height = vp.height;
+        cv.style.cssText = 'width:100%;display:block;margin:0 0 8px;border-radius:8px;background:#fff;box-shadow:0 2px 10px rgba(42,31,20,.08)';
+        box.appendChild(cv);
+        await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+      }
+      if (pdf.numPages > 30) box.insertAdjacentHTML('beforeend', `<div class="sch-meta" style="text-align:center">Faqat dastlabki 30 bet ko'rsatildi (${pdf.numPages} bet). To'liqini Telegramga yuboring.</div>`);
+    } catch (e) {
+      box.innerHTML = `<div class="empty-box">PDF'ni shu yerda chizib bo'lmadi.<br>«📨 Telegramga» tugmasi bilan yuboring.</div>`;
+    }
+  }
+  function closeTrModal() {
+    document.getElementById('trModal').style.display = 'none';
+    document.getElementById('trPages').innerHTML = '';
+    if (_trBlob) { URL.revokeObjectURL(_trBlob); _trBlob = ''; }
+  }
+  async function sendTranscriptFile() {
+    showNotify("Yuborilmoqda...", true);
+    try {
+      const r = await (await fetch('/api/admin/transcript_send', { method: 'POST', headers: getHeaders(), body: JSON.stringify({ email: _trCur }) })).json();
+      showNotify(r.message || 'Xatolik', r.status === 'success');
+    } catch (e) { showNotify('Xatolik', false); }
+  }
+
+  /* Hisobot (admin) */
+  function _isoAdd(iso, n) { const [y, m, d] = iso.split('-').map(Number); const dt = new Date(Date.UTC(y, m - 1, d + n)); return dt.toISOString().slice(0, 10); }
+  function rpQuick(k) {
+    const t = tashkentNow().date;
+    let from = t, to = t;
+    if (k === 'yesterday') from = to = _isoAdd(t, -1);
+    else if (k === '7') from = _isoAdd(t, -6);
+    else if (k === '30') from = _isoAdd(t, -29);
+    document.getElementById('rpFrom').value = from; document.getElementById('rpTo').value = to;
+    document.querySelectorAll('#rpChips .rp-chip').forEach(b => b.classList.toggle('on', b.dataset.k === k));
+    loadReport();
+  }
+  function rpCustom() { document.querySelectorAll('#rpChips .rp-chip').forEach(b => b.classList.remove('on')); loadReport(); }
+  function _rpQuery() { return `from=${encodeURIComponent(document.getElementById('rpFrom').value)}&to=${encodeURIComponent(document.getElementById('rpTo').value)}`; }
+
+  async function loadReport() {
+    const box = document.getElementById('rpBody');
+    box.innerHTML = '<div class="empty-box">Yuklanmoqda...</div>';
+    try {
+      const d = await (await fetch('/api/admin/report?' + _rpQuery(), { headers: getHeaders() })).json();
+      if (d.status !== 'success') { box.innerHTML = `<div class="sch-err">${esc(d.message || 'Xatolik')}</div>`; return; }
+      renderReport(d);
+    } catch (e) { box.innerHTML = '<div class="sch-err">Yuklab bo\'lmadi</div>'; }
+  }
+
+  function renderReport(d) {
+    const S = d.summary, box = document.getElementById('rpBody');
+    if (!S.scans) { box.innerHTML = `<div class="empty-box">📭 ${esc(S.date_from)} — ${esc(S.date_to)} oralig'ida skaner bo'lmagan.</div>`; return; }
+    const kpi = (v, l, c) => `<div class="rp-kpi ${c || ''}"><b>${v}</b><span>${l}</span></div>`;
+    let h = `<div class="rp-period"><b>Skanerlash hisoboti</b>
+      <span>📅 ${esc(S.date_from)} — ${esc(S.date_to)} (Toshkent vaqti)</span>
+      <span>🕒 Birinchi skaner: ${esc(S.first)}<br>🕒 Oxirgi skaner: ${esc(S.last)}</span>
+      <span style="opacity:.75">Tuzilgan: ${esc(S.generated)}</span></div>
+      <div class="rp-kpis">${kpi(S.scans, 'Skanerlar')}${kpi(S.scanners, 'Foydalanuvchi')}${kpi(S.accounts, 'Akkaunt')}
+      ${kpi(S.ok + ' / ' + S.total, 'Kirdi / Jami', 'good')}${kpi(S.rate + '%', 'Muvaffaqiyat', S.rate >= 80 ? 'good' : (S.rate < 50 ? 'bad' : ''))}${kpi(S.failed, 'Kirmadi', S.failed ? 'bad' : '')}</div>
+      <div class="rp-note">⏱ O'rtacha skaner vaqti: <b>${S.avg_duration} s</b>${S.duplicates ? ` · 🔁 Takroriy (avval kirgan) skanerlar: <b>${S.duplicates}</b>` : ''}.<br>«Kirdi / Jami» — akkauntlar bo'yicha: nechta akkaunt darsga kirgani va nechtasiga urinilgani.</div>`;
+
+    const table = (heads, rows) => `<div class="tbl-wrap"><table class="tbl"><thead><tr>${heads.map(x => `<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+    h += `<details class="rp-box" open><summary>📅 Kunlar bo'yicha <small>${d.days.length} kun</small></summary>${table(['Sana', 'Skaner', 'Kirdi', 'Jami'],
+      d.days.map(x => `<tr><td><b>${esc(x.day)}</b></td><td>${x.scans}</td><td>${x.ok}</td><td>${x.total}</td></tr>`))}</details>`;
+    h += `<details class="rp-box" open><summary>👤 Kim skaner qildi <small>${d.scanners.length} kishi</small></summary>${table(['Foydalanuvchi', 'Skaner', 'Kirdi / Jami'],
+      d.scanners.map(x => `<tr><td>${esc(x.name)}</td><td>${x.scans}</td><td>${x.ok}/${x.total}</td></tr>`))}</details>`;
+    h += `<details class="rp-box"><summary>📚 Darslar bo'yicha <small>${d.lessons.length} ta</small></summary>${table(['Dars', 'Skaner', 'Kim', 'Kirgan akkaunt'],
+      d.lessons.map(x => `<tr><td>${esc(x.lesson)}</td><td>${x.scans}</td><td>${x.scanners}</td><td>${x.accounts}</td></tr>`))}</details>`;
+
+    const pill = x => `<span class="rp-pill ${x.ok === 0 ? 'no' : (x.ok < x.total ? 'mid' : 'ok')}">${x.ok}/${x.total} kirdi</span>`;
+    h += `<details class="rp-box" open><summary>🔎 Barcha skanerlar (to'liq) <small>${d.scans.length} ta</small></summary>` + d.scans.map(x => `
+      <details class="rp-scan"><summary>
+        <div class="rp-time">🕒 ${esc(x.time)}</div>
+        <div class="rp-les">📚 ${esc(x.lesson)}</div>
+        <div class="rp-meta">${pill(x)}<span class="rp-pill">${x.kind === 'auto' ? '🤖 avtomatik' : '📷 qo\'lda'}</span><span>👤 ${esc(x.scanner)}</span><span>⏱ ${x.duration} s</span></div>
+      </summary><div class="rp-items">` + (x.items.length ? x.items.map(i => `<div class="rp-it"><span class="ic">${i.ok ? '✅' : '❌'}</span><span><span class="nm">${esc(i.name || i.email)}${i.student_id ? ' · ' + esc(i.student_id) : ''}</span>${i.name ? `<span class="em">${esc(i.email)}</span>` : ''}${i.msg ? `<span class="ms">${esc(i.msg)}</span>` : ''}</span></div>`).join('') : '<div class="rp-note">Akkauntlar ro\'yxati saqlanmagan</div>') + `</div></details>`).join('') + `</details>`;
+
+    h += `<details class="rp-box"><summary>🎓 Akkauntlar kesimida <small>${d.accounts.length} ta</small></summary>${table(['Ism / ID', 'Email', 'Kirdi', 'Kirmadi'],
+      d.accounts.map(x => `<tr><td><b>${esc(x.name || '—')}</b>${x.student_id ? `<br><span style="opacity:.7">${esc(x.student_id)}</span>` : ''}</td><td style="word-break:break-all">${esc(x.email)}</td><td>${x.ok}</td><td>${x.fail}</td></tr>`))}</details>`;
+    box.innerHTML = h;
+  }
+
+  async function sendReport() {
+    showNotify('Excel tayyorlanmoqda...', true);
+    try {
+      const r = await (await fetch('/api/admin/report_send', { method: 'POST', headers: getHeaders(), body: JSON.stringify({ from: document.getElementById('rpFrom').value, to: document.getElementById('rpTo').value }) })).json();
+      showNotify(r.message || 'Xatolik', r.status === 'success');
+    } catch (e) { showNotify('Xatolik', false); }
+  }
+
+  /* Hazillar (admin) */
+  let _jokes = [], _jkReplace = false;
+  async function loadJokes() {
+    try {
+      const d = await (await fetch('/api/admin/jokes', { headers: getHeaders() })).json();
+      if (d.status !== 'success') { document.getElementById('jkList').innerHTML = `<div class="sch-err">${esc(d.message || 'Xatolik')}</div>`; return; }
+      _jokes = d.jokes || []; renderJokes();
+    } catch (e) { document.getElementById('jkList').innerHTML = '<div class="sch-err">Yuklab bo\'lmadi</div>'; }
+  }
+  let _jkSort = 0;
+  function jkSort(k) { _jkSort = k; [0, 1, 2].forEach(i => document.getElementById('jkS' + i).classList.toggle('on', i === k)); renderJokes(); }
+  function renderJokes() {
+    const q = (document.getElementById('jkSearch').value || '').trim().toLowerCase();
+    let list = q ? _jokes.filter(j => j.text.toLowerCase().includes(q)) : _jokes.slice();
+    if (_jkSort === 1) list.sort((a, b) => (b.score || 0) - (a.score || 0) || b.id - a.id);
+    if (_jkSort === 2) list = list.filter(j => (j.down || 0) > 0).sort((a, b) => (b.down || 0) - (a.down || 0));
+    document.getElementById('jkCount').textContent = `Jami: ${_jokes.length} ta hazil` + (q ? ` · topildi: ${list.length}` : '');
+    document.getElementById('jkList').innerHTML = list.length ? list.map(j => `<div class="jk-item" id="jk_${j.id}">
+      <div class="jk-text">${esc(j.text)}<div class="jk-votes">👍 ${j.up || 0} · 👎 ${j.down || 0}${(j.score || 0) <= -3 ? ' · <span style="color:var(--red)">yashirilgan</span>' : ''}</div></div>
+      <div class="jk-acts"><button class="act-btn" onclick="jokeEdit(${j.id})" title="Tahrirlash">✏️</button><button class="act-btn del" onclick="jokeDelete(${j.id})" title="O'chirish">🗑</button></div></div>`).join('')
+      : `<div class="empty-box" style="margin-top:10px">${q ? 'Hech narsa topilmadi' : 'Hazillar yo\'q. Yuqorida qo\'shing yoki fayl yuklang.'}</div>`;
+  }
+  function jokeEdit(id) {
+    const j = _jokes.find(x => x.id === id); if (!j) return;
+    document.getElementById('jk_' + id).innerHTML = `<div style="flex:1;min-width:0"><textarea class="inp" id="jkEd_${id}" rows="3" maxlength="500">${esc(j.text)}</textarea>
+      <div class="jk-edit-btns"><button class="act-btn" onclick="renderJokes()">Bekor</button><button class="act-btn" style="background:var(--ink);color:var(--cream)" onclick="jokeSave(${id})">💾 Saqlash</button></div></div>`;
+    document.getElementById('jkEd_' + id).focus();
+  }
+  async function jokeSave(id) {
+    const text = document.getElementById('jkEd_' + id).value;
+    try {
+      const r = await (await fetch('/api/admin/jokes_update', { method: 'POST', headers: getHeaders(), body: JSON.stringify({ id, text }) })).json();
+      showNotify(r.message || 'Xatolik', r.status === 'success');
+      if (r.status === 'success') loadJokes();
+    } catch (e) { showNotify('Xatolik', false); }
+  }
+  async function jokeDelete(id) {
+    if (!confirm("Bu hazilni o'chirasizmi?")) return;
+    try {
+      const r = await (await fetch('/api/admin/jokes_delete', { method: 'POST', headers: getHeaders(), body: JSON.stringify({ id }) })).json();
+      showNotify(r.message || 'Xatolik', r.status === 'success');
+      if (r.status === 'success') { _jokes = _jokes.filter(j => j.id !== id); renderJokes(); }
+    } catch (e) { showNotify('Xatolik', false); }
+  }
+  async function _jokesImport(text, replace) {
+    try {
+      const r = await (await fetch('/api/admin/jokes_import', { method: 'POST', headers: getHeaders(), body: JSON.stringify({ text, replace }) })).json();
+      showNotify(r.message || 'Xatolik', r.status === 'success');
+      if (r.status === 'success') loadJokes();
+      return r.status === 'success';
+    } catch (e) { showNotify('Xatolik', false); return false; }
+  }
+  async function jokesAddText() {
+    const box = document.getElementById('jkNew');
+    if (!box.value.trim()) { showNotify('Hazil matnini yozing', false); return; }
+    if (await _jokesImport(box.value, false)) box.value = '';
+  }
+  function jokesPickFile(replace) { _jkReplace = replace; const f = document.getElementById('jkFile'); f.value = ''; f.click(); }
+  async function jokesFileChosen(inp) {
+    const file = inp.files && inp.files[0]; if (!file) return;
+    if (file.size > 1024 * 1024) { showNotify('Fayl 1 MB dan katta bo\'lmasin', false); return; }
+    if (_jkReplace && !confirm("Barcha hazillar shu fayl bilan ALMASHTIRILADI. Davom etasizmi?")) return;
+    await _jokesImport(await file.text(), _jkReplace);
+  }
+  async function jokesSendFile() {
+    showNotify('Yuborilmoqda...', true);
+    try {
+      const r = await (await fetch('/api/admin/jokes_send', { method: 'POST', headers: getHeaders() })).json();
+      showNotify(r.message || 'Xatolik', r.status === 'success');
+    } catch (e) { showNotify('Xatolik', false); }
+  }
+
+  /* ===== Til (uz / en / ru): matnlar o'zbekcha yozilgan, boshqa tillarga lug'at orqali tarjima qilinadi ===== */
+  const I18N = {
+    en: {
+      "Botdan olingan kalitni kiriting": "Enter the key you got from the bot", "Login (hero_...)": "Login (hero_...)", "Parol": "Password", "Tizimga Kirish →": "Sign in →",
+      "Boshqaruv": "Control", "paneli": "panel", "Ulashish": "Share", "Fikr qoldirish": "Leave feedback", "Chiqish": "Log out",
+      "Jami Akkaunt": "Total accounts", "So'nggi Natija": "Last result", "Yangi profil qo'shish": "Add new profile",
+      "Faqat @newuu.uz domeni. Parolingiz shifrlab saqlanadi.": "Only the @newuu.uz domain. Your password is stored encrypted.",
+      "Email (@newuu.uz)": "Email (@newuu.uz)", "Hero Paroli": "Hero password", "+ Qo'shish va Tekshirish": "+ Add and verify",
+      "Faol profillar": "Active profiles", "Yuklanmoqda...": "Loading...", "📷 Skanerlashni Boshlash": "📷 Start scanning", "Hali profillar yo'q": "No profiles yet",
+      "Aktiv": "Active", "Nofaol": "Inactive", "Parol shifrlangan": "Password is encrypted", "Yangilash tugmasini bosing": "Press the refresh button", "Ro'yxatda topilmadi": "Not found in the list",
+      "Fikr": "Leave", "Qoldirish": "feedback", "← Orqaga": "← Back", "Ilovani yaxshilashimiz uchun o'z fikringiz, topilgan xatoliklar yoki takliflaringizni yozib qoldiring.": "Tell us your thoughts, bugs you found or suggestions so we can improve the app.",
+      "Umumiy Fikr": "General feedback", "Xatolik (Bug) haqida": "Bug report", "Yaxshilash Taklifi": "Improvement idea", "Baholang": "Rate us",
+      "Xabaringizni bu yerga yozing...": "Write your message here...", "📤 Yuborish": "📤 Send",
+      "markazi": "center", "📤 Kod yaratish": "📤 Create a code", "📋 Nusxalash": "📋 Copy", "✨ Yangi Kod Yaratish": "✨ Create new code", "📥 Kodni qo'llash": "📥 Apply a code",
+      "Masalan: A3X7KQ": "Example: A3X7KQ", "🔗 Ulashishni Qabul Qilish": "🔗 Accept sharing", "Mavjud ulanishlar": "Existing connections",
+      "Skaner Natijasi": "Scan result", "Yopish": "Close", "Profilni Tahrirlash": "Edit profile", "Faqat @newuu.uz domeni qabul qilinadi. Parolingiz shifrlanadi.": "Only the @newuu.uz domain is accepted. Your password is encrypted.",
+      "Yangi Email (@newuu.uz)": "New email (@newuu.uz)", "Yangi Parol": "New password", "Bekor": "Cancel", "Saqlash": "Save", "Ma'lumot yo'q": "No data",
+      "Davomat": "Attendance", "Umumiy": "Overall", "Oxirgi 7 kun": "Last 7 days", "30 kun": "30 days", "Fanlar bo'yicha": "By subject", "Qoldirilgan darslar": "Missed lessons",
+      "ℹ️ Faqat shu bot orqali skaner qilingan darslar hisobga olinadi.": "ℹ️ Only lessons scanned through this bot are counted.",
+      "Baholang va xabar yozing": "Please rate and write a message", "Faqat @newuu.uz": "Only @newuu.uz", "Kirdingiz!": "Signed in!", "Kod yaratildi": "Code created", "Kutilmoqda...": "Please wait...",
+      "Nusxalandi": "Copied", "Server bilan aloqa yo'q. Qayta urinib ko'ring.": "No connection to the server. Try again.", "Tarmoq xatosi. Qayta urinib ko'ring.": "Network error. Try again.",
+      "Tekshirilmoqda...": "Checking...", "To'ldiring": "Please fill in", "Xabaringiz yuborildi!": "Your message was sent!", "Xato": "Error", "Xatolik": "Error", "Yangilanmoqda...": "Updating...",
+      "Yuborilmoqda...": "Sending...", "❌ Hech bir akkaunt kirmadi": "❌ No account was checked in", "Sessiya tugadi. Qayta kiring.": "Session expired. Please sign in again.", "Arxivga yuborilsinmi?": "Move to archive?",
+    },
+    ru: {
+      "Botdan olingan kalitni kiriting": "Введите ключ, полученный от бота", "Login (hero_...)": "Логин (hero_...)", "Parol": "Пароль", "Tizimga Kirish →": "Войти →",
+      "Boshqaruv": "Панель", "paneli": "управления", "Ulashish": "Поделиться", "Fikr qoldirish": "Оставить отзыв", "Chiqish": "Выйти",
+      "Jami Akkaunt": "Всего аккаунтов", "So'nggi Natija": "Последний результат", "Yangi profil qo'shish": "Добавить профиль",
+      "Faqat @newuu.uz domeni. Parolingiz shifrlab saqlanadi.": "Только домен @newuu.uz. Пароль хранится в зашифрованном виде.",
+      "Email (@newuu.uz)": "Email (@newuu.uz)", "Hero Paroli": "Пароль Hero", "+ Qo'shish va Tekshirish": "+ Добавить и проверить",
+      "Faol profillar": "Активные профили", "Yuklanmoqda...": "Загрузка...", "📷 Skanerlashni Boshlash": "📷 Начать сканирование", "Hali profillar yo'q": "Профилей пока нет",
+      "Aktiv": "Активен", "Nofaol": "Неактивен", "Parol shifrlangan": "Пароль зашифрован", "Yangilash tugmasini bosing": "Нажмите кнопку обновления", "Ro'yxatda topilmadi": "Не найден в списке",
+      "Fikr": "Оставить", "Qoldirish": "отзыв", "← Orqaga": "← Назад", "Ilovani yaxshilashimiz uchun o'z fikringiz, topilgan xatoliklar yoki takliflaringizni yozib qoldiring.": "Напишите свой отзыв, найденные ошибки или предложения, чтобы мы улучшили приложение.",
+      "Umumiy Fikr": "Общий отзыв", "Xatolik (Bug) haqida": "Сообщение об ошибке", "Yaxshilash Taklifi": "Предложение по улучшению", "Baholang": "Оцените",
+      "Xabaringizni bu yerga yozing...": "Напишите сообщение здесь...", "📤 Yuborish": "📤 Отправить",
+      "markazi": "центр", "📤 Kod yaratish": "📤 Создать код", "📋 Nusxalash": "📋 Копировать", "✨ Yangi Kod Yaratish": "✨ Создать новый код", "📥 Kodni qo'llash": "📥 Применить код",
+      "Masalan: A3X7KQ": "Например: A3X7KQ", "🔗 Ulashishni Qabul Qilish": "🔗 Принять доступ", "Mavjud ulanishlar": "Текущие подключения",
+      "Skaner Natijasi": "Результат сканирования", "Yopish": "Закрыть", "Profilni Tahrirlash": "Редактировать профиль", "Faqat @newuu.uz domeni qabul qilinadi. Parolingiz shifrlanadi.": "Принимается только домен @newuu.uz. Пароль шифруется.",
+      "Yangi Email (@newuu.uz)": "Новый email (@newuu.uz)", "Yangi Parol": "Новый пароль", "Bekor": "Отмена", "Saqlash": "Сохранить", "Ma'lumot yo'q": "Нет данных",
+      "Davomat": "Посещаемость", "Umumiy": "Всего", "Oxirgi 7 kun": "Последние 7 дней", "30 kun": "30 дней", "Fanlar bo'yicha": "По предметам", "Qoldirilgan darslar": "Пропущенные занятия",
+      "ℹ️ Faqat shu bot orqali skaner qilingan darslar hisobga olinadi.": "ℹ️ Учитываются только занятия, отсканированные через этого бота.",
+      "Baholang va xabar yozing": "Поставьте оценку и напишите сообщение", "Faqat @newuu.uz": "Только @newuu.uz", "Kirdingiz!": "Вы вошли!", "Kod yaratildi": "Код создан", "Kutilmoqda...": "Подождите...",
+      "Nusxalandi": "Скопировано", "Server bilan aloqa yo'q. Qayta urinib ko'ring.": "Нет связи с сервером. Повторите попытку.", "Tarmoq xatosi. Qayta urinib ko'ring.": "Ошибка сети. Повторите попытку.",
+      "Tekshirilmoqda...": "Проверка...", "To'ldiring": "Заполните поля", "Xabaringiz yuborildi!": "Сообщение отправлено!", "Xato": "Ошибка", "Xatolik": "Ошибка", "Yangilanmoqda...": "Обновление...",
+      "Yuborilmoqda...": "Отправка...", "❌ Hech bir akkaunt kirmadi": "❌ Ни один аккаунт не отмечен", "Sessiya tugadi. Qayta kiring.": "Сессия истекла. Войдите снова.", "Arxivga yuborilsinmi?": "Отправить в архив?",
+    },
+  };
+  const I18N_HTML = {
+    share_info: {
+      en: "🔒 <b>Safe:</b> when your friend scans, your attendance is marked too, but they can <b>never see</b> your email and password.",
+      ru: "🔒 <b>Безопасно:</b> когда друг сканирует, вам тоже ставится отметка, но он <b>никогда не увидит</b> вашу почту и пароль.",
+    },
+  };
+  const I18N_RX = {
+    en: [[/^✅ Darsga kirdi \((\d+)\)$/, '✅ Checked in ($1)'], [/^❌ Kirmadi \((\d+)\)$/, '❌ Not checked in ($1)'],
+         [/^(.*) darsga kirdi( — .*)?$/, '$1 checked in$2'], [/^(\d+) ta "(.*)" darsiga kirdi$/, '$1 checked in to "$2"'], [/^(\d+) ta darsga kirdi$/, '$1 checked in'],
+         [/^(.*) va yana (\d+) ta darsga kirdi(.*)$/, '$1 and $2 more checked in$3'], [/^Amal qiladi: (.*) gacha \(Toshkent vaqti\)$/, 'Valid until: $1 (Tashkent time)']],
+    ru: [[/^✅ Darsga kirdi \((\d+)\)$/, '✅ Отмечены ($1)'], [/^❌ Kirmadi \((\d+)\)$/, '❌ Не отмечены ($1)'],
+         [/^(.*) darsga kirdi( — .*)?$/, '$1: отмечено$2'], [/^(\d+) ta "(.*)" darsiga kirdi$/, 'Отмечено: $1, «$2»'], [/^(\d+) ta darsga kirdi$/, 'Отмечено: $1'],
+         [/^(.*) va yana (\d+) ta darsga kirdi(.*)$/, '$1 и ещё $2: отмечены$3'], [/^Amal qiladi: (.*) gacha \(Toshkent vaqti\)$/, 'Действует до: $1 (время Ташкента)']],
+  };
+  let LANG = (() => {
+    const s = lsGet('lang'); if (['uz', 'en', 'ru'].includes(s)) return s;
+    const c = (((window.Telegram || {}).WebApp || {}).initDataUnsafe || {}).user; const l = ((c && c.language_code) || 'uz').slice(0, 2);
+    return ['en', 'ru'].includes(l) ? l : 'uz';
+  })();
+  const _orig = new WeakMap(), _last = new WeakMap();
+  const I18N_ROOTS = ['loginScreen', 'dashboardScreen', 'feedbackScreen', 'shareScreen', 'resultModal', 'editModal', 'notification'];
+  function trText(s) {
+    if (LANG === 'uz' || !s) return s;
+    const str = String(s), k = str.trim(), d = I18N[LANG];
+    if (d[k] !== undefined) return str.replace(k, d[k]);
+    for (const [re, rep] of I18N_RX[LANG]) if (re.test(k)) return str.replace(k, k.replace(re, rep));
+    return s;
+  }
+  function _inScope(n) {
+    for (let p = n.parentNode; p; p = p.parentNode) { if (p.id === 'adminScreen') return false; if (p.id && I18N_ROOTS.includes(p.id)) return true; }
+    return false;
+  }
+  function i18nNode(node) {
+    const cur = node.nodeValue; if (!cur || !cur.trim() || !_inScope(node)) return;
+    if (!_orig.has(node) || _last.get(node) !== cur) _orig.set(node, cur);   // matn tashqaridan o'zgargan — yangi asl nusxa
+    const out = LANG === 'uz' ? _orig.get(node) : trText(_orig.get(node));
+    _last.set(node, out); if (out !== cur) node.nodeValue = out;
+  }
+  function i18nEl(el) {
+    if (!el.closest || el.closest('#adminScreen')) return;
+    for (const a of ['placeholder', 'title']) {
+      if (!el.hasAttribute(a)) continue;
+      const key = 'data-uz-' + a; if (!el.hasAttribute(key)) el.setAttribute(key, el.getAttribute(a));
+      el.setAttribute(a, LANG === 'uz' ? el.getAttribute(key) : trText(el.getAttribute(key)));
+    }
+    if (el.dataset && el.dataset.i18n) {
+      if (el.dataset.uzHtml === undefined) el.dataset.uzHtml = el.innerHTML;
+      const h = LANG === 'uz' ? el.dataset.uzHtml : ((I18N_HTML[el.dataset.i18n] || {})[LANG] || el.dataset.uzHtml);
+      if (el.innerHTML !== h) el.innerHTML = h;
+    }
+  }
+  function i18nScan(root) {
+    if (root.nodeType === 3) return i18nNode(root);
+    if (root.nodeType !== 1) return;
+    i18nEl(root); root.querySelectorAll('[placeholder],[title],[data-i18n]').forEach(i18nEl);
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) i18nNode(n);
+  }
+  function setLang(l, sync) {
+    if (!['uz', 'en', 'ru'].includes(l)) return;
+    LANG = l; lsSet('lang', l); document.documentElement.lang = l;
+    document.querySelectorAll('.lang-sw button').forEach(b => b.classList.toggle('on', b.dataset.l === l));
+    i18nScan(document.body);
+    if (sync !== false && lsGet('h_token')) fetch('/api/lang', { method: 'POST', headers: getHeaders(), body: JSON.stringify({ lang: l }) }).catch(() => {});
+  }
+  new MutationObserver(ms => {
+    for (const m of ms) {
+      if (m.type === 'characterData') i18nNode(m.target);
+      else m.addedNodes.forEach(n => i18nScan(n));
+    }
+  }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  document.addEventListener('DOMContentLoaded', () => setLang(LANG, false));
+  if (document.readyState !== 'loading') setLang(LANG, false);
+
+  /* ===== Davomat kartasi (foydalanuvchi) ===== */
+  async function loadAttendance() {
+    try {
+      const d = await (await fetch('/api/attendance', { headers: getHeaders() })).json();
+      const box = document.getElementById('attBox'), lab = document.getElementById('attLabel');
+      if (d.status !== 'success' || !d.accounts.length) { box.innerHTML = ''; lab.style.display = 'none'; return; }
+      lab.style.display = 'flex';
+      box.innerHTML = d.accounts.map(a => `<div class="att-card">
+        <div class="att-top"><div class="att-name">${esc(a.name)}</div><div class="att-pct ${a.pct >= 85 ? 'good' : a.pct < 60 ? 'bad' : ''}">${a.pct}%</div></div>
+        <div class="att-bar"><i style="width:${a.pct}%"></i></div>
+        <div class="att-meta"><span><span class="k">Umumiy</span> ${a.attended}/${a.total}</span><span><span class="k">Oxirgi 7 kun</span> ${a.week[0]}/${a.week[1]}</span><span><span class="k">30 kun</span> ${a.month[0]}/${a.month[1]}</span>${a.streak ? `<span>🔥 ${a.streak}</span>` : ''}</div>
+        <details class="att-more"><summary>Fanlar bo'yicha</summary>
+          ${a.subjects.slice(0, 10).map(s => `<div class="att-sub"><span>${esc(s.title)}</span><b>${s.a}/${s.t}</b></div>`).join('')}
+          ${a.missed.length ? `<div class="att-miss"><span class="k">Qoldirilgan darslar</span>${a.missed.map(m => `<div>• ${esc(m.time)} — ${esc(m.title)}</div>`).join('')}</div>` : ''}
+        </details></div>`).join('') + `<div class="rp-note">ℹ️ Faqat shu bot orqali skaner qilingan darslar hisobga olinadi.</div>`;
+    } catch (e) {}
+  }
+  async function syncLang() {
+    try {
+      const saved = lsGet('lang');
+      if (saved) await fetch('/api/lang', { method: 'POST', headers: getHeaders(), body: JSON.stringify({ lang: saved }) });
+      else { const d = await (await fetch('/api/lang', { headers: getHeaders() })).json(); if (d.status === 'success') setLang(d.lang, false); }
+    } catch (e) {}
+  }
+
+  /* ===== 🩺 Salomatlik (admin) ===== */
+  const HL = { ok: ['✅ Sog\'lom', 'ok'], idle: ['💤 Faol emas', 'mid'], failing: ['⚠️ Ketma-ket kirmayapti', 'mid'], login_error: ['❌ Login/parol xato', 'no'], no_token: ['⛔ Tokensiz', 'no'] };
+  let _hlAll = false;
+  async function loadHealth() {
+    const box = document.getElementById('hlBody');
+    box.innerHTML = '<div class="empty-box">Tekshirilmoqda...</div>';
+    try {
+      const d = await (await fetch('/api/admin/health', { headers: getHeaders() })).json();
+      if (d.status !== 'success') { box.innerHTML = `<div class="sch-err">${esc(d.message || 'Xatolik')}</div>`; return; }
+      const c = d.counts, bad = d.accounts.filter(a => ['login_error', 'no_token', 'failing'].includes(a.status)), fixable = d.accounts.filter(a => ['login_error', 'no_token'].includes(a.status)).length;
+      const kpi = (v, l, cl) => `<div class="rp-kpi ${cl || ''}"><b>${v}</b><span>${l}</span></div>`;
+      const row = a => `<div class="hl-row"><div class="hl-main"><b>${esc(a.name || a.email)}</b>${a.name ? `<span class="em">${esc(a.email)}</span>` : ''}
+        <span class="em">👤 ${esc(a.owner)} · ✅ ${a.ok} · ❌ ${a.fail}${a.last ? ` · so'nggi: ${esc(a.last)}` : ''}</span>${a.msg && a.status === 'failing' ? `<span class="ms">${esc(a.msg)} (${a.streak_fail}×)</span>` : ''}</div>
+        <div class="hl-side"><span class="rp-pill ${HL[a.status][1]}">${HL[a.status][0]}</span><div style="display:flex;gap:6px">${['login_error', 'no_token', 'failing'].includes(a.status) ? `<button class="act-btn" onclick="healthFix('${esc(escJs(a.email))}')" title="Tiklash">🔧</button>` : ''}<button class="act-btn del" onclick="healthDelete('${esc(escJs(a.email))}', '${esc(escJs(a.name || a.email))}')" title="O'chirish">🗑</button></div></div></div>`;
+      const list = (_hlAll ? d.accounts : bad);
+      box.innerHTML = `<div class="rp-kpis">${kpi(d.scans_today, 'Bugungi skanerlar')}${kpi(d.zero_today, 'Bugun 0/N', d.zero_today ? 'bad' : 'good')}${kpi(d.total, 'Akkauntlar')}</div>
+        <div class="rp-note">💾 Oxirgi avto-zaxira: <b>${esc(d.last_backup || '—')}</b></div>
+        <div class="rp-chips"><span class="rp-pill ok">✅ ${c.ok}</span><span class="rp-pill mid">💤 ${c.idle}</span><span class="rp-pill mid">⚠️ ${c.failing}</span><span class="rp-pill no">❌ ${c.login_error}</span><span class="rp-pill no">⛔ ${c.no_token}</span></div>
+        <div class="tool-grid" style="margin:10px 0 12px"><button class="btn btn-primary" onclick="healthFix('')" ${fixable ? '' : 'disabled'}>🛠 Tokenlarni tiklash (${fixable})</button>
+        <button class="btn btn-secondary" onclick="_hlAll=!_hlAll;loadHealth()">${_hlAll ? '⚠️ Faqat muammolilar' : '📋 Hammasi'}</button>
+        <button class="btn btn-secondary tool-wide" onclick="healthDeleteInvalid(${fixable})" ${fixable ? '' : 'disabled'} style="${fixable ? 'color:var(--red)' : ''}">🗑 Yaroqsizlarni o'chirish (${fixable})</button></div>
+        ${list.length ? `<div class="rp-box" style="padding:0 14px">${list.map(row).join('')}</div>` : '<div class="empty-box">🎉 Muammoli akkaunt yo\'q</div>'}`;
+    } catch (e) { box.innerHTML = '<div class="sch-err">Yuklab bo\'lmadi</div>'; }
+  }
+  async function healthFix(email) {
+    showNotify('Tiklanmoqda...', true);
+    try {
+      const r = await (await fetch('/api/admin/health_fix', { method: 'POST', headers: getHeaders(), body: JSON.stringify({ email }) })).json();
+      showNotify(r.message || 'Xatolik', r.status === 'success'); loadHealth();
+    } catch (e) { showNotify('Xatolik', false); }
+  }
+
+  async function _hlPost(path, body) {
+    try {
+      const r = await (await fetch('/api/admin/' + path, { method: 'POST', headers: getHeaders(), body: JSON.stringify(body) })).json();
+      showNotify(r.message || 'Xatolik', r.status === 'success'); loadHealth();
+    } catch (e) { showNotify('Xatolik', false); }
+  }
+  function healthDelete(email, name) { if (confirm(`«${name}» akkauntini o'chirasizmi?\n\nU arxivga ko'chiriladi (📦 Arxiv bo'limidan qaytarish mumkin), egasiga xabar boradi.`)) _hlPost('health_delete', { email }); }
+  function healthDeleteInvalid(n) { if (n && confirm(`Login/parol xato yoki tokensiz ${n} ta akkaunt arxivga o'chirilsinmi?\n\nEgalariga xabar boradi. Arxivdan qaytarish mumkin.`)) _hlPost('health_delete', { mode: 'invalid' }); }
+
+  /* ===== 💬 Barcha suhbatlar (admin) ===== */
+  let _chTab = 'pairs', _chBefore = 0, _chQ = '', _chSeq = 0;
+  function chatTab(t) { _chTab = t; if (t === 'rep') loadChat(); else if (t === 'log') { _chBefore = 0; loadChatLog(false); } else { _chBefore = 0; loadChatPairs(false); } }
+  async function loadChatPairs(append) {
+    const _my = (append === true) ? _chSeq : ++_chSeq;
+    const box = document.getElementById('chBody');
+    if (!append) box.innerHTML = '<div class="empty-box">Yuklanmoqda...</div>';
+    try {
+      const d = await (await fetch(`/api/admin/chat_pairs?q=${encodeURIComponent(_chQ)}&before=${append ? _chBefore : 0}`, { headers: getHeaders() })).json();
+      if (_my !== _chSeq) return;
+      if (d.status !== 'success') { box.innerHTML = `<div class="sch-err">${esc(d.message || 'Xatolik')}</div>`; return; }
+      if (d.pairs.length) _chBefore = d.pairs[d.pairs.length - 1].last_id;
+      const list = d.pairs.map(p => `<div class="ch-card"><div class="ch-top"><b>${esc(p.a_name)}${p.a_user ? ' @' + esc(p.a_user) : ''}</b><span>⇄</span><b>${esc(p.b_name)}${p.b_user ? ' @' + esc(p.b_user) : ''}</b></div>
+        <div class="rp-note" style="padding:4px 0">${p.count} ta xabar · ${esc(p.time)}${p.reported ? ' · ⚠️ ' + p.reported + ' shikoyat' : ''}${p.failed ? ' · ❌ ' + p.failed + ' yetmagan' : ''}</div>
+        <div class="ch-text">${p.last_from_a ? esc(p.a_name) : esc(p.b_name)}${p.last_anon ? ' 🎭' : ''}: ${esc(p.text)}</div>
+        <div class="ch-acts"><button class="act-btn" onclick="chatThread(${p.a},${p.b})">💬 Yozishmani ochish</button></div></div>`).join('');
+      if (append) { document.getElementById('chMore')?.remove(); box.insertAdjacentHTML('beforeend', list); }
+      else box.innerHTML = `<input type="text" id="chSearch" class="inp" placeholder="🔎 Qidirish: ism yoki @username..." value="${esc(_chQ)}" oninput="chSearch()">` + (list || '<div class="empty-box">Hali suhbat yo\'q</div>');
+      if (d.more) box.insertAdjacentHTML('beforeend', '<button class="btn btn-secondary" id="chMore" onclick="loadChatPairs(true)">Yana yuklash</button>');
+    } catch (e) { box.innerHTML = '<div class="sch-err">Yuklab bo\'lmadi</div>'; }
+  }
+  function _chMsg(m, thread) {
+    const who = `<b>${esc(m.sender)}</b>${m.sender_user ? ' @' + esc(m.sender_user) : ''}`, to = `<b>${esc(m.receiver)}</b>${m.receiver_user ? ' @' + esc(m.receiver_user) : ''}`;
+    const kind = { dm: '💬 xabar', reply: '↩️ javob', req: '🙋 iltimos' }[m.kind] || m.kind;
+    return `<div class="ch-card ${m.reported ? '' : ''}"><div class="ch-top"><b>#${m.id}</b><span>${esc(m.time)}</span><span class="rp-pill">${kind}</span><span class="rp-pill">${m.anonymous ? '🎭 anonim' : '👤 ismi bilan'}</span>${m.reported ? '<span class="rp-pill">⚠️ shikoyat</span>' : ''}${m.delivered === false ? '<span class="rp-pill" title="' + esc(m.error || '') + '">❌ yetmagan</span>' : ''}</div>
+      <div class="rp-note" style="padding:4px 0">${who} ➜ ${to}${m.reply_to ? ' · ↩️ #' + m.reply_to + ' ga javob' : ''}${m.lesson ? ' · 📚 ' + esc(m.lesson) : ''}</div>
+      <div class="ch-text">${esc(m.text)}</div>
+      ${thread ? '' : `<div class="ch-acts"><button class="act-btn" onclick="chatThread(${m.from_uid},${m.to_uid})">💬 Suhbatni ochish</button></div>`}</div>`;
+  }
+  async function loadChatLog(append) {
+    const _my = (append === true) ? _chSeq : ++_chSeq;
+    const box = document.getElementById('chBody');
+    if (!append) box.innerHTML = '<div class="empty-box">Yuklanmoqda...</div>';
+    try {
+      const d = await (await fetch(`/api/admin/chat_log?q=${encodeURIComponent(_chQ)}&before=${append ? _chBefore : 0}`, { headers: getHeaders() })).json();
+      if (_my !== _chSeq) return;
+      if (d.status !== 'success') { box.innerHTML = `<div class="sch-err">${esc(d.message || 'Xatolik')}</div>`; return; }
+      if (d.messages.length) _chBefore = d.messages[d.messages.length - 1].id;
+      const list = d.messages.map(m => _chMsg(m, false)).join('');
+      if (append) { document.getElementById('chMore')?.remove(); box.insertAdjacentHTML('beforeend', list); }
+      else box.innerHTML = `<input type="text" id="chSearch" class="inp" placeholder="🔎 Qidirish: ism, @username, matn..." value="${esc(_chQ)}" oninput="chSearch()">` + (list || '<div class="empty-box">Xabar topilmadi</div>');
+      if (d.more) box.insertAdjacentHTML('beforeend', '<button class="btn btn-secondary" id="chMore" onclick="loadChatLog(true)">Yana yuklash</button>');
+    } catch (e) { box.innerHTML = '<div class="sch-err">Yuklab bo\'lmadi</div>'; }
+  }
+  let _chT; function chSearch() { clearTimeout(_chT); const el = document.getElementById('chSearch'); if (!el) return; _chQ = (el.value || '').trim(); _chT = setTimeout(async () => { const s = document.getElementById('chSearch'); const pos = s ? s.selectionStart : 0; await (_chTab === 'pairs' ? loadChatPairs(false) : loadChatLog(false)); const n = document.getElementById('chSearch'); if (n) { n.focus(); n.setSelectionRange(pos, pos); } }, 400); }
+  async function chatThread(a, b) {
+    const _my = ++_chSeq;
+    const box = document.getElementById('chBody');
+    box.innerHTML = '<div class="empty-box">Yuklanmoqda...</div>';
+    try {
+      const d = await (await fetch(`/api/admin/chat_thread?a=${a}&b=${b}`, { headers: getHeaders() })).json();
+      if (_my !== _chSeq) return;
+      if (d.status !== 'success') { box.innerHTML = `<div class="sch-err">${esc(d.message || 'Xatolik')}</div>`; return; }
+      box.innerHTML = `<button class="btn btn-secondary" onclick="chatTab(_chTab)" style="margin-bottom:10px">⬅️ Orqaga</button>` + (d.messages.map(m => _chMsg(m, true)).join('') || '<div class="empty-box">Xabar yo\'q</div>');
+    } catch (e) { box.innerHTML = '<div class="sch-err">Yuklab bo\'lmadi</div>'; }
+  }
+
+  /* ===== 🛡 Suhbat nazorati (admin) ===== */
+  async function loadChat() {
+    const _my = ++_chSeq;
+    const box = document.getElementById('chBody');
+    box.innerHTML = '<div class="empty-box">Yuklanmoqda...</div>';
+    try {
+      const d = await (await fetch('/api/admin/chat_reports', { headers: getHeaders() })).json();
+      if (_my !== _chSeq) return;
+      if (d.status !== 'success') { box.innerHTML = `<div class="sch-err">${esc(d.message || 'Xatolik')}</div>`; return; }
+      let h = `<div class="rp-kpis"><div class="rp-kpi"><b>${d.week.messages}</b><span>7 kunda xabar</span></div><div class="rp-kpi ${d.week.reported ? 'bad' : 'good'}"><b>${d.week.reported}</b><span>Shikoyat</span></div><div class="rp-kpi"><b>${d.bans.length}</b><span>Chetlatilgan</span></div></div>
+        <div class="rp-note">Anonim xabarlarning yuboruvchisini faqat siz (admin) ko'rasiz; bu foydalanuvchilarga oldindan aytilgan. 3 xil odam shikoyat qilsa — 3 kunga avtomatik chetlatiladi.</div>`;
+      if (d.bans.length) h += `<details class="rp-box" open><summary>⛔ Chetlatilganlar <small>${d.bans.length}</small></summary><div style="padding:6px 14px 10px">${d.bans.map(b => `<div class="hl-row"><div class="hl-main"><b>${esc(b.name)}</b><span class="em">gacha: ${esc(b.until)}${b.auto ? ' · avtomatik' : ''}${b.reason ? ' · ' + esc(b.reason) : ''}</span></div><div class="hl-side"><button class="act-btn" onclick="chatUnban(${b.user_id})">Qaytarish</button></div></div>`).join('')}</div></details>`;
+      h += d.reports.length ? d.reports.map(r => `<div class="ch-card ${r.reviewed ? 'done' : ''}">
+        <div class="ch-top"><b>#${r.id}</b><span>${esc(r.time)}</span><span class="rp-pill">${r.anonymous ? '🎭 anonim' : '👤 ismi bilan'}</span>${r.reviewed ? '<span class="rp-pill ok">✔️ ko\'rilgan</span>' : ''}</div>
+        <div class="ch-text">${esc(r.text)}</div>
+        <div class="rp-note" style="padding:6px 0">👤 Yuboruvchi: <b>${esc(r.sender)}</b>${r.sender_user ? ' @' + esc(r.sender_user) : ''} · 📩 Shikoyatchi: ${esc(r.receiver)}${r.lesson ? ' · 📚 ' + esc(r.lesson) : ''}<br>📊 Unga jami ${r.sender_reports} ta shikoyat (${r.sender_reporters} kishidan)${r.banned_until ? ` · <b style="color:var(--red)">⛔ ${esc(r.banned_until)} gacha</b>` : ''}</div>
+        <div class="ch-acts">${r.banned_until ? `<button class="act-btn" onclick="chatUnban(${r.from_uid})">Qaytarish</button>` : `<button class="act-btn del" onclick="chatBan(${r.from_uid},3)">⛔ 3 kun</button><button class="act-btn del" onclick="chatBan(${r.from_uid},7)">⛔ 7 kun</button><button class="act-btn del" onclick="chatBan(${r.from_uid},30)">⛔ 30 kun</button>`}
+        ${r.reviewed ? '' : `<button class="act-btn" onclick="chatReview(${r.id})">✔️ Ko'rildi</button>`}</div></div>`).join('') : '<div class="empty-box">🎉 Shikoyatlar yo\'q</div>';
+      box.innerHTML = h;
+    } catch (e) { box.innerHTML = '<div class="sch-err">Yuklab bo\'lmadi</div>'; }
+  }
+  async function _chatPost(path, body, ok) {
+    try {
+      const r = await (await fetch('/api/admin/' + path, { method: 'POST', headers: getHeaders(), body: JSON.stringify(body) })).json();
+      showNotify(r.message || 'Xatolik', r.status === 'success'); if (r.status === 'success') loadChat();
+    } catch (e) { showNotify('Xatolik', false); }
+  }
+  function chatBan(uid, days) { if (confirm(`${days} kunga suhbatdan chetlatilsinmi?`)) _chatPost('chat_ban', { user_id: uid, days }); }
+  function chatUnban(uid) { _chatPost('chat_unban', { user_id: uid }); }
+  function chatReview(id) { _chatPost('chat_review', { id }); }
+
+  /* ===== 📜 Jurnal (admin) ===== */
+  async function loadAudit() {
+    const box = document.getElementById('auBody');
+    const q = (document.getElementById('auSearch').value || '').trim();
+    try {
+      const d = await (await fetch('/api/admin/audit?limit=300&q=' + encodeURIComponent(q), { headers: getHeaders() })).json();
+      if (d.status !== 'success') { box.innerHTML = `<div class="sch-err">${esc(d.message || 'Xatolik')}</div>`; return; }
+      box.innerHTML = d.rows.length ? d.rows.map(r => `<div class="au-row"><div class="au-top"><b>${esc(r.action)}</b><span>${esc(r.time)}</span></div>
+        <div class="au-sub">👤 ${esc(r.actor || '—')}${r.target ? ' → ' + esc(r.target) : ''}</div>${r.detail ? `<div class="au-sub">${esc(r.detail)}</div>` : ''}${r.result ? `<div class="au-res ${/^error/.test(r.result) ? 'bad' : ''}">${esc(r.result)}</div>` : ''}</div>`).join('') : '<div class="empty-box">Yozuv topilmadi</div>';
+    } catch (e) { box.innerHTML = '<div class="sch-err">Yuklab bo\'lmadi</div>'; }
+  }
+  let _auT; function auSearch() { clearTimeout(_auT); _auT = setTimeout(loadAudit, 350); }
+
+  /* ===== 💬 Suhbat (foydalanuvchi, mini-ilova) ===== */
+  let MC = { tab: 'in', busy: false, lessons: [], seq: 0 };
+  async function mcApi(path, body) {
+    try {
+      const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 20000);   // osilib qolgan so'rov tugmalarni qulflab qo'ymasin
+      const r = await fetch('/api/chat/' + path, body === undefined ? { headers: getHeaders(), signal: ctl.signal } : { method: 'POST', headers: getHeaders(), body: JSON.stringify(body), signal: ctl.signal }).finally(() => clearTimeout(tm));
+      if (r.status === 401) { forceLogout('Qayta kiring'); return { status: 'error', message: 'Qayta kiring' }; }
+      return await r.json();
+    } catch (e) { return { status: 'error', message: 'Aloqa xatosi. Qayta urinib ko\'ring.' }; }
+  }
+  async function mcAct(btn, fn) {   // qo'sh bosishdan himoya
+    if (MC.busy) return; MC.busy = true; if (btn) btn.disabled = true;
+    try { await fn(); } finally { MC.busy = false; if (btn) btn.disabled = false; }
+  }
+  function mcOpen() { mcTab(MC.tab || 'in'); }
+  function mcTab(t) {
+    MC.tab = t;
+    document.querySelectorAll('#mcTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+    if (t === 'in' || t === 'out') mcLoadBox(t); else if (t === 'new') mcCompose(); else mcSettings();
+  }
+  function mcBody(html) { document.getElementById('mcBody').innerHTML = html; }
+  async function mcLoadBox(box) {
+    mcBody('<div class="empty-box">Yuklanmoqda...</div>');
+    const d = await mcApi('inbox?box=' + box);
+    if (MC.tab !== box) return;
+    if (d.status !== 'success') { mcBody(`<div class="sch-err">${esc(d.message || 'Xatolik')}</div>`); return; }
+    const kinds = { dm: '', reply: '↩️ javob', req: '🙋 iltimos' };
+    let h = d.banned ? `<div class="sch-err" style="margin-bottom:10px">${esc(d.banned)}</div>` : '';
+    if (!d.items.length) { mcBody(h + `<div class="empty-box">${box === 'in' ? 'Hali xabar kelmagan' : 'Hali xabar yubormagansiz'}</div>`); return; }
+    h += d.items.map(m => {
+      const k = kinds[m.kind] || '';
+      if (box === 'in') return `<div class="mc-card" id="mc${m.id}"><div class="mc-top"><b>${esc(m.who)}${m.user ? ' @' + esc(m.user) : ''}</b><span>${esc(m.time)}</span></div>
+        ${k || m.lesson ? `<div class="mc-meta" style="margin:0 0 6px">${k}${m.lesson ? ' · 📚 ' + esc(m.lesson) : ''}</div>` : ''}<div class="mc-text">${esc(m.text)}</div>
+        <div class="mc-acts"><button class="act-btn" onclick="mcToggleReply(${m.id})">↩️ Javob</button>${m.blocked ? '' : `<button class="act-btn" onclick="mcBlock(this,${m.id})">🚫 Bloklash</button>`}${m.reported ? '' : `<button class="act-btn del" onclick="mcReport(this,${m.id})">⚠️ Shikoyat</button>`}</div>
+        <div class="mc-reply" id="mcr${m.id}"><textarea class="inp" rows="3" maxlength="500" placeholder="Javobingiz (500 belgigacha)..."></textarea><button class="btn btn-primary" onclick="mcReply(this,${m.id})">📤 Javob yuborish</button></div></div>`;
+      const to = m.kind === 'req' ? `👥 ${m.count} ta darsdoshga (${m.delivered_n} tasiga yetdi)` : esc(m.who) + (m.user ? ' @' + esc(m.user) : '');
+      return `<div class="mc-card"><div class="mc-top"><b>${to}</b><span>${esc(m.time)}</span></div>
+        <div class="mc-meta" style="margin:0 0 6px">${m.anonymous ? '🎭 anonim' : '👤 ismingiz bilan'}${k ? ' · ' + k : ''}${m.lesson ? ' · 📚 ' + esc(m.lesson) : ''}${m.delivered ? '' : ' · ❌ yetib bormadi (u botni ishga tushirmagan bo\'lishi mumkin)'}</div>
+        <div class="mc-text">${esc(m.text)}</div></div>`;
+    }).join('');
+    mcBody(h);
+  }
+  function mcToggleReply(id) { document.getElementById('mcr' + id)?.classList.toggle('open'); }
+  function mcReply(btn, id) {
+    const ta = document.querySelector('#mcr' + id + ' textarea'); const text = (ta.value || '').trim();
+    if (!text) return showNotify('Javob matnini yozing', false);
+    mcAct(btn, async () => { const r = await mcApi('reply', { id, text }); showNotify(r.message || 'Xatolik', r.status === 'success'); if (r.status === 'success') { ta.value = ''; mcToggleReply(id); } });
+  }
+  function mcBlock(btn, id) { if (!confirm('Yuboruvchi bloklansinmi? U sizga yoza olmaydi.')) return; mcAct(btn, async () => { const r = await mcApi('block', { id }); showNotify(r.message || 'Xatolik', r.status === 'success'); if (r.status === 'success') btn.remove(); }); }
+  function mcReport(btn, id) { if (!confirm('Bu xabar haqida adminga shikoyat yuborilsinmi?')) return; mcAct(btn, async () => { const r = await mcApi('report', { id }); showNotify(r.message || 'Xatolik', r.status === 'success'); if (r.status === 'success') btn.remove(); }); }
+
+  function mcCompose() {
+    mcBody(`<div class="card"><div class="card-title" style="margin-bottom:10px">💬 Do'stga yozish</div>
+      <input type="text" id="mcUser" class="inp" placeholder="@username (u botga /start yuborgan bo'lsin)" autocapitalize="off" autocomplete="off">
+      <textarea id="mcText" class="inp" rows="4" maxlength="500" placeholder="Xabar matni (500 belgigacha, havolasiz)..."></textarea>
+      <label class="mc-row"><input type="checkbox" id="mcAnon" checked> 🎭 Anonim yuborish (ismim ko'rinmasin)</label>
+      <button class="btn btn-primary" onclick="mcSend(this)">📤 Yuborish</button></div>
+      <div class="card"><div class="card-title" style="margin-bottom:10px">📚 Darsdoshlar</div><div class="card-sub">Bir xil darsda o'qiydiganlarga yozing yoki hammasiga bitta iltimos yuboring.</div>
+      <button class="btn btn-secondary" onclick="mcLessons()">📚 Darslarimni ko'rsatish</button><div id="mcLess" style="margin-top:10px"></div></div>`);
+  }
+  function mcSend(btn) {
+    const username = (document.getElementById('mcUser').value || '').trim(), text = (document.getElementById('mcText').value || '').trim();
+    if (!username) return showNotify('@username kiriting', false);
+    if (!text) return showNotify('Xabar matnini yozing', false);
+    mcAct(btn, async () => {
+      const r = await mcApi('send', { username, text, anonymous: document.getElementById('mcAnon').checked });
+      showNotify(r.message || 'Xatolik', r.status === 'success'); const el = document.getElementById('mcText'); if (r.status === 'success' && el) el.value = '';
+    });
+  }
+  async function mcLessons() {
+    const box = document.getElementById('mcLess'); if (!box) return; box.innerHTML = '<div class="empty-box">Yuklanmoqda...</div>';
+    const my = ++MC.seq; const d = await mcApi('lessons');
+    if (my !== MC.seq || !document.getElementById('mcLess')) return;
+    MC.lessons = d.lessons || [];
+    if (d.status !== 'success') { box.innerHTML = `<div class="sch-err">${esc(d.message || 'Xatolik')}</div>`; return; }
+    if (!d.lessons.length) { box.innerHTML = '<div class="empty-box">📭 Jadvalingizdan yaqin darslar topilmadi. Hero akkauntingiz ulangan va jadval yangilangan bo\'lishi kerak.</div>'; return; }
+    box.innerHTML = d.lessons.map((l, i) => `<div class="mc-card"><div class="mc-text" style="font-weight:600">📚 ${esc(l.label)}</div>
+      <div class="mc-acts"><button class="act-btn" onclick="mcClassmates(${i})">👥 Darsdoshlar</button><button class="act-btn" onclick="mcReqForm(${i})">🙋 Iltimos</button></div></div>`).join('');
+  }
+  async function mcClassmates(i) {
+    const L = MC.lessons[i]; if (!L) return mcTab('new');
+    mcBody('<div class="empty-box">Yuklanmoqda...</div>');
+    const my = ++MC.seq; const d = await mcApi('classmates?k=' + encodeURIComponent(L.key));
+    if (my !== MC.seq || MC.tab !== 'new') return;
+    if (d.status !== 'success') { mcBody(`<div class="sch-err">${esc(d.message || 'Xatolik')}</div><button class="btn btn-secondary" onclick="mcTab('new')">⬅️ Orqaga</button>`); return; }
+    mcBody(`<button class="btn btn-secondary" onclick="mcTab('new')" style="margin-bottom:10px">⬅️ Orqaga</button><div class="sec-label">${esc(d.label)} · ${d.people.length} ta</div>` +
+      (d.people.length ? d.people.map(p => `<div class="mc-card"><div class="mc-top"><b>${esc(p.name)}${p.username && p.name[0] !== '@' ? ' @' + esc(p.username) : ''}</b></div>
+        <textarea class="inp" rows="2" maxlength="500" placeholder="Xabar..." id="mcp${p.uid}"></textarea>
+        <label class="mc-row"><input type="checkbox" id="mcpa${p.uid}" checked> 🎭 Anonim</label>
+        <button class="btn btn-primary" onclick="mcSendTo(this,${i},${p.uid})">📤 Yuborish</button></div>`).join('') : '<div class="empty-box">Ro\'yxatda ko\'rinishga rozi darsdosh topilmadi</div>'));
+  }
+  function mcSendTo(btn, i, uid) {
+    const L = MC.lessons[i]; if (!L) return showNotify('Ro\'yxat eskirgan, qayta oching', false);
+    const text = (document.getElementById('mcp' + uid).value || '').trim(); if (!text) return showNotify('Xabar matnini yozing', false);
+    mcAct(btn, async () => {
+      const r = await mcApi('send', { to_uid: uid, lesson: L.key, text, anonymous: document.getElementById('mcpa' + uid).checked });
+      showNotify(r.message || 'Xatolik', r.status === 'success'); const el = document.getElementById('mcp' + uid); if (r.status === 'success' && el) el.value = '';
+    });
+  }
+  const MC_TPL = ["🙏 Kimdir QR kodni skaner qilib yubora oladimi?", "📝 Dars konspektini (rasmini) tashlab bera olasizmi?", "❓ Bugungi dars nima haqida bo'ldi?", "📚 Uy vazifasi nima edi?"];
+  function mcReqForm(i) {
+    mcBody(`<button class="btn btn-secondary" onclick="mcTab('new')" style="margin-bottom:10px">⬅️ Orqaga</button><div class="card"><div class="card-title" style="margin-bottom:10px">🙋 Darsdoshlarga iltimos</div>
+      ${MC_TPL.map((t, k) => `<button class="btn btn-secondary mc-list-btn" onclick="document.getElementById('mcReqText').value=MC_TPL[${k}]">${esc(t)}</button>`).join('')}
+      <textarea id="mcReqText" class="inp" rows="3" maxlength="500" placeholder="Yoki o'z matningiz..."></textarea>
+      <label class="mc-row"><input type="checkbox" id="mcReqAnon" checked> 🎭 Anonim</label>
+      <button class="btn btn-primary" onclick="mcReqSend(this,${i})">📤 Hammasiga yuborish</button></div>`);
+  }
+  function mcReqSend(btn, i) {
+    const L = MC.lessons[i]; if (!L) return showNotify('Ro\'yxat eskirgan, qayta oching', false);
+    const text = (document.getElementById('mcReqText').value || '').trim(); if (!text) return showNotify('Matn yozing', false);
+    mcAct(btn, async () => { const r = await mcApi('request', { lesson: L.key, text, anonymous: document.getElementById('mcReqAnon').checked }); showNotify(r.message || 'Xatolik', r.status === 'success'); });
+  }
+  async function mcSettings() {
+    mcBody('<div class="empty-box">Yuklanmoqda...</div>');
+    const d = await mcApi('settings');
+    if (MC.tab !== 'set') return;
+    if (d.status !== 'success') { mcBody(`<div class="sch-err">${esc(d.message || 'Xatolik')}</div>`); return; }
+    mcBody(`<div class="card"><div class="card-title" style="margin-bottom:10px">⚙️ Sozlamalar</div>
+      <label class="mc-row"><input type="checkbox" ${d.accept ? 'checked' : ''} onchange="mcSet({accept:this.checked})"> 📥 Xabar qabul qilish (o'chirsangiz hech kim yoza olmaydi)</label>
+      <label class="mc-row"><input type="checkbox" ${d.findable ? 'checked' : ''} onchange="mcSet({findable:this.checked})"> 🔎 Darsdoshlar ro'yxatida ko'rinish</label>
+      ${d.blocked ? `<button class="btn btn-secondary" onclick="mcSet({unblock_all:true}).then(mcSettings)">🚫 Bloklanganlarni tozalash (${d.blocked})</button>` : ''}</div>`);
+  }
+  async function mcSet(body) { const r = await mcApi('settings', body); showNotify(r.status === 'success' ? 'Saqlandi' : (r.message || 'Xatolik'), r.status === 'success'); }
+
+  init();
+</script>
+</body>
+</html>
