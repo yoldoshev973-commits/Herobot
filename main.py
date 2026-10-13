@@ -1083,7 +1083,7 @@ async def build_scan_report(date_from, date_to):
         scans.append({"id": r["id"], "time": _fmt_tk(r["scanned_at"]), "scanner": scanner, "lesson": lesson, "ok": ok_n, "total": all_n,
                       "duration": round(float(r.get("duration") or 0), 1), "items": clean,
                       "kind": ("auto" if str(lesson).endswith("· avto") else "manual")})
-    summary = {"scans": len(rows), "scanners": len(scanners), "accounts": len(accounts), "ok": tot_ok, "total": tot_all,
+    summary = {"scans": len(scans), "scanners": len(scanners), "accounts": len(accounts), "ok": tot_ok, "total": tot_all,
                "failed": max(0, tot_all - tot_ok), "duplicates": dup, "rate": round(tot_ok * 100 / tot_all) if tot_all else 0,
                "avg_duration": round(sum(durations) / len(durations), 1) if durations else 0,
                "first": scans[-1]["time"] if scans else None, "last": scans[0]["time"] if scans else None,
