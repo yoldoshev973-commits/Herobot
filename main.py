@@ -782,7 +782,7 @@ async def _scan_extra(emails, qr_url, title, tag, on_missing=None):
 
 # --- HAMROH AKKAUNTLAR ---
 # Admin tanlagan akkauntlar (admin panelda 🤝 Hamrohlar): kim skaner qilib, kimdir darsga KIRSA — ular ham o'sha QR bilan avtomatik skanerlanadi.
-# Dars jadvaliga bog'liq emas va "Avto-yuborish" tugmasidan mustaqil.
+# Faqat HAMROHNING O'Z DARSI bo'lsa yuboriladi (skaner qilingan dars bilan bir xil, jadvalga ko'ra). "Avto-yuborish" tugmasidan mustaqil.
 COMPANION_KEY = "companion_emails"
 _comp_marked = {}   # (qr_url, email) -> vaqt: bir QR ikki marta yuborilmasin
 
@@ -791,9 +791,22 @@ async def get_companions():
     except Exception: v = []
     return [e for e in v if isinstance(e, str)] if isinstance(v, list) else []
 
-async def scan_companions(skip_emails, qr_url, title):
+async def _companions_in_lesson(comp, ok_emails):
+    """Hamroh akkauntlardan FAQAT shu darsi bor (jadvaliga ko'ra hozir ketayotgan) larini qaytaradi.
+    Dars: skanerdan kirganlarning hozirgi darsi. Aniqlab bo'lmasa — hamrohning o'zida hozir dars ketayotgan bo'lsa."""
+    if not comp: return []
+    rows = await db.get_all_schedules()
+    groups = await asyncio.to_thread(hero_schedule.group_lessons, rows)
+    active = [g for g in groups.values() if hero_schedule.is_active_now(g)]
+    ok_set = set(ok_emails)
+    same = [g for g in active if g["emails"] & ok_set]
+    pool_ = same or active
+    allowed = set().union(*[g["emails"] for g in pool_]) if pool_ else set()
+    return [e for e in comp if e in allowed]
+
+async def scan_companions(skip_emails, qr_url, title, ok_emails=()):
     try:
-        comp = await get_companions()
+        comp = await _companions_in_lesson(await get_companions(), ok_emails)
         now_ts = time.time()
         for kk in [kk for kk, t in _comp_marked.items() if now_ts - t > 1800]: _comp_marked.pop(kk, None)
         todo = [e for e in comp if e not in skip_emails and (qr_url, e) not in _comp_marked]
@@ -807,7 +820,7 @@ async def scan_companions(skip_emails, qr_url, title):
 
 async def _after_scan(scanned_emails, ok_emails, qr_url, scanner_uid, title):
     attempted = await broadcast_to_lesson(scanned_emails, ok_emails, qr_url, scanner_uid) or set()
-    await scan_companions(set(scanned_emails) | attempted, qr_url, title)
+    await scan_companions(set(scanned_emails) | attempted, qr_url, title, ok_emails)
 
 async def admin_companions(request):
     """Admin: hamroh akkauntlar ro'yxati + tanlash uchun barcha akkauntlar."""
