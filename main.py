@@ -729,10 +729,10 @@ async def broadcast_to_lesson(scanned_emails, ok_emails, qr_url, scanner_uid):
                 if e in scanned_emails or (k, e) in _lesson_marked: continue
                 target[e] = k; _lesson_marked[(k, e)] = now_ts   # oldindan band qilamiz
         if not target: return set()
-        res = await _scan_extra(target.keys(), qr_url, (groups[keys[0]].get("title") or "Dars"), "avto",
-                                on_missing=lambda e: _lesson_marked.pop((target[e], e), None))
+        res, wrong = await _scan_extra(target.keys(), qr_url, (groups[keys[0]].get("title") or "Dars"), "avto",
+                                       on_missing=lambda e: _lesson_marked.pop((target[e], e), None))
         for e, k in target.items():
-            if not res.get(e): _lesson_marked.pop((k, e), None)   # kirmaganlarni keyingi skaner qayta urinib ko'ra oladi
+            if not res.get(e) and e not in wrong: _lesson_marked.pop((k, e), None)   # boshqa guruh bo'lmaganlarni keyingi skaner qayta urinib ko'ra oladi
         return set(target)
     except Exception as e:
         logger.error(f"Dars bo'yicha avto-yuborish xatosi: {e}")
@@ -752,7 +752,8 @@ async def _scan_extra(emails, qr_url, title, tag, on_missing=None):
             if e not in by_email: on_missing(e)
     success, total, duration, report, _ = await mark_all_accounts_smart(list(by_email.values()), qr_url, _update_token_db)
     res = {r["email"]: r["ok"] for r in report if r["email"] in by_email}
-    if not res: return {}
+    wrong = {r["email"] for r in report if r["email"] in by_email and not r["ok"] and r.get("reason") == "not_in_lesson"}   # Hero: bu QR ularning guruhiga tegishli emas
+    if not res: return {}, set()
     by_owner = {}
     for a in accs: by_owner.setdefault(a["user_id"], []).append(a)
     for uid, owner_accs in by_owner.items():
@@ -760,6 +761,7 @@ async def _scan_extra(emails, qr_url, title, tag, on_missing=None):
         for a in owner_accs:
             if a["email"] not in res: continue
             if a.get("has_primary") and not a.get("is_primary"): continue   # asosiy akkaunti bor — faqat o'shani ko'rsatamiz
+            if a["email"] in wrong: continue   # boshqa guruh: xato emas — tarix/hisobot/salomatlikni buzmasin
             st = students.lookup(a["email"]) or {}
             name, sid = a.get("full_name") or st.get("full_name"), a.get("student_id") or st.get("student_id")
             items.append({"email": a["email"], "ok": bool(res[a["email"]]), "name": name, "student_id": sid, "label": person_label(name, sid, a["email"])})
@@ -777,8 +779,8 @@ async def _scan_extra(emails, qr_url, title, tag, on_missing=None):
                                             f"{_fmt_people(passed)}\n\n😄 {jtext}\n\n🕒 {tashkent_now():%d.%m.%Y %H:%M:%S} {i18n.t(lg, 'tz')}")[:4000],
                                        reply_markup=jokes.vote_kb(jid))
             except Exception as e: logger.warning(f"Qo'shimcha skaner xabari yuborilmadi: {e}")
-    logger.info(f"🔁 {tag} ({title}): {sum(1 for v in res.values() if v)}/{len(res)} kirdi")
-    return res
+    logger.info(f"🔁 {tag} ({title}): {sum(1 for v in res.values() if v)}/{len(res) - len(wrong)} kirdi" + (f" (+{len(wrong)} ta boshqa guruh)" if wrong else ""))
+    return res, wrong
 
 # --- HAMROH AKKAUNTLAR ---
 # Admin tanlagan akkauntlar (admin panelda 🤝 Hamrohlar): kim skaner qilib, kimdir darsga KIRSA — ular ham o'sha QR bilan avtomatik skanerlanadi.
@@ -812,9 +814,9 @@ async def scan_companions(skip_emails, qr_url, title, ok_emails=()):
         todo = [e for e in comp if e not in skip_emails and (qr_url, e) not in _comp_marked]
         if not todo: return
         for e in todo: _comp_marked[(qr_url, e)] = now_ts
-        res = await _scan_extra(todo, qr_url, title or "Dars", "hamroh", on_missing=lambda e: _comp_marked.pop((qr_url, e), None))
+        res, wrong = await _scan_extra(todo, qr_url, title or "Dars", "hamroh", on_missing=lambda e: _comp_marked.pop((qr_url, e), None))
         for e in todo:
-            if not res.get(e): _comp_marked.pop((qr_url, e), None)
+            if not res.get(e) and e not in wrong: _comp_marked.pop((qr_url, e), None)   # boshqa guruh — shu QR bilan qayta urinilmaydi
     except Exception as e:
         logger.error(f"Hamroh akkauntlarni skanerlash xatosi: {e}")
 
@@ -1048,6 +1050,7 @@ async def build_scan_report(date_from, date_to):
         if not isinstance(items, list): items = []
         ok_n, all_n = int(r.get("success_count") or 0), int(r.get("total_count") or 0)
         lesson = r.get("lesson") or "—"
+        if ok_n == 0 and (lesson.endswith(" · avto") or lesson.endswith(" · hamroh")): continue   # avto-yuborishdagi 'kirmadi' yozuvlari skaner emas
         scanner = r.get("login") or "—"
         day = (r["scanned_at"] + TASHKENT_OFFSET).strftime("%d.%m.%Y")
         tot_ok += ok_n; tot_all += all_n

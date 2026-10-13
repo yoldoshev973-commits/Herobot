@@ -64,14 +64,16 @@ async def _scan_items():
         return rows
     since = datetime.utcnow() - timedelta(days=LOG_DAYS)
     async with db.pool.acquire() as conn:
-        raw = await conn.fetch("SELECT scanned_at, details FROM scan_logs WHERE scanned_at >= $1 ORDER BY scanned_at DESC LIMIT 20000", since)
+        raw = await conn.fetch("SELECT scanned_at, details, lesson FROM scan_logs WHERE scanned_at >= $1 ORDER BY scanned_at DESC LIMIT 20000", since)
 
     def parse():
         out = []
         for r in raw:
             items = db._jsonish(r["details"]) or []
             if isinstance(items, list):
-                out.append((r["scanned_at"] + TZ_OFF, [(i.get("email"), bool(i.get("ok")), i.get("msg")) for i in items if isinstance(i, dict) and i.get("email")]))
+                auto = str(r["lesson"] or "").endswith((" · avto", " · hamroh"))   # avto-yuborish: kirmaganlar ko'pincha boshqa guruh — akkaunt xatosi emas
+                out.append((r["scanned_at"] + TZ_OFF, [(i.get("email"), bool(i.get("ok")), i.get("msg")) for i in items
+                                                       if isinstance(i, dict) and i.get("email") and not (i.get("reason") == "not_in_lesson" and not i.get("ok")) and not (auto and not i.get("ok"))]))
         return out
     rows = await asyncio.to_thread(parse)
     _cache["logs"] = (time.time(), rows)
@@ -179,8 +181,8 @@ async def health_overview():
     async with db.pool.acquire() as conn:
         t0 = datetime.utcnow() + TZ_OFF   # Toshkent hozirgi vaqti
         t0 = datetime(t0.year, t0.month, t0.day) - TZ_OFF   # Toshkent yarim kechasi (UTC'da)
-        zero_today = await conn.fetchval("SELECT COUNT(*) FROM scan_logs WHERE scanned_at >= $1 AND success_count = 0 AND total_count > 0", t0) or 0
-        scans_today = await conn.fetchval("SELECT COUNT(*) FROM scan_logs WHERE scanned_at >= $1", t0) or 0
+        zero_today = await conn.fetchval("SELECT COUNT(*) FROM scan_logs WHERE scanned_at >= $1 AND success_count = 0 AND total_count > 0 AND COALESCE(lesson,'') NOT LIKE '% · avto' AND COALESCE(lesson,'') NOT LIKE '% · hamroh'", t0) or 0
+        scans_today = await conn.fetchval("SELECT COUNT(*) FROM scan_logs WHERE scanned_at >= $1 AND COALESCE(lesson,'') NOT LIKE '% · avto' AND COALESCE(lesson,'') NOT LIKE '% · hamroh'", t0) or 0
     order = {"login_error": 0, "no_token": 1, "failing": 2, "idle": 3, "ok": 4}
     rows.sort(key=lambda r: (order[r["status"]], -r["streak_fail"], (r["name"] or r["email"]).lower()))
     return {"counts": counts, "total": len(rows), "accounts": rows, "zero_today": zero_today, "scans_today": scans_today,
