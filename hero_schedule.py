@@ -258,3 +258,23 @@ def is_active_now(l, now=None, early_min=20, default_len_min=90):
 
 def today_str(now=None):
     return (now or datetime.now(TZ)).strftime("%Y-%m-%d")
+
+
+def _norm_title(t):
+    return re.sub(r"\s+", " ", str(t or "")).strip().lower()
+
+
+def companions_for_lesson(comp, groups, ok_emails, title=None, now=None):
+    """Hamroh akkauntlardan FAQAT skaner qilingan darsning o'zi (bir xil sana + vaqt + fan) jadvalida bor va hozir ketayotganlarini qaytaradi.
+    1) skaner qilib kirganlarning hozirgi darsi aniqlanadi; 2) topilmasa — hozir ketayotgan darslar orasidan QR'dan olingan fan nomi bo'yicha.
+    Dars aniqlanmasa — hech kim qaytmaydi (boshqa fandagi hamrohga yuborib yubormaslik uchun)."""
+    active = [g for g in groups.values() if is_active_now(g, now)]
+    ok_set = set(ok_emails)
+    t = _norm_title(title)
+    same = [g for g in active if g["emails"] & ok_set]
+    if len(same) > 1 and t:
+        same = [g for g in same if _norm_title(g.get("title")) == t] or same
+    if not same and t:
+        same = [g for g in active if _norm_title(g.get("title")) == t]
+    allowed = set().union(*[g["emails"] for g in same]) if same else set()
+    return [e for e in comp if e in allowed]

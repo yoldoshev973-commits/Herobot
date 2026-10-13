@@ -281,9 +281,9 @@ async def mark_all_accounts_smart(accounts: list, qr_url: str, db_update_func):
 
 
 def person_label(name, student_id, email):
-    """'Ism Familya (ID)' ko'rinishi; ro'yxatda topilmasa — email."""
+    """'Ism Familya (ID)' ko'rinishi; ism topilmasa — faqat email."""
     if name: return f"{name} ({student_id})" if student_id else name
-    return f"{email} (ro'yxatda topilmadi)"
+    return email
 
 def _fmt_people(items, limit=40):
     lines = [f"• {i['label']}" for i in items[:limit]]
@@ -561,7 +561,7 @@ async def add_user(request):
     await db.add_hero_account(u_id, email, password, token=token)
     if is_valid: _spawn_schedule(email, token, password)   # yangi token -> dars jadvali ham olinadi
     st = students.lookup(email)
-    who = f" — {st['full_name']} ({st['student_id']})" if st else " (ro'yxatda topilmadi)"
+    who = f" — {st['full_name']} ({st['student_id']})" if st else ""
     if st and st['ambiguous']: who += " ⚠️ bir nechta talabaga mos"
     return web.json_response({"status": "success", "message": ("Saqlandi va aktivlashtirildi!" if is_valid else "Saqlandi, lekin nofaol (Parol xato)") + who})
 
@@ -581,7 +581,7 @@ async def edit_user(request):
             await conn.execute("UPDATE hero_accounts SET bearer_token=$1 WHERE id=$2", result if is_valid else "ERROR:LOGIN_FAILED", int(acc_id))
         if is_valid: _spawn_schedule(email, result, password)
         st = students.lookup(email)
-        return web.json_response({"status": "success", "message": "Yangilandi!" + (f" — {st['full_name']} ({st['student_id']})" if st else " (ro'yxatda topilmadi)")})
+        return web.json_response({"status": "success", "message": "Yangilandi!" + (f" — {st['full_name']} ({st['student_id']})" if st else "")})
     return web.json_response({"status": "error", "message": "Topilmadi"})
 
 async def reload_user_token(request):
@@ -793,22 +793,17 @@ async def get_companions():
     except Exception: v = []
     return [e for e in v if isinstance(e, str)] if isinstance(v, list) else []
 
-async def _companions_in_lesson(comp, ok_emails):
-    """Hamroh akkauntlardan FAQAT shu darsi bor (jadvaliga ko'ra hozir ketayotgan) larini qaytaradi.
-    Dars: skanerdan kirganlarning hozirgi darsi. Aniqlab bo'lmasa — hamrohning o'zida hozir dars ketayotgan bo'lsa."""
+async def _companions_in_lesson(comp, ok_emails, title=None):
+    """Hamroh akkauntlardan FAQAT shu darsi bor (jadvaliga ko'ra hozir ketayotgan, bir xil fan va vaqt) larini qaytaradi.
+    Dars: skanerdan kirganlarning hozirgi darsi; topilmasa — QR'dan olingan fan nomi bo'yicha. Aniqlanmasa — hech kim."""
     if not comp: return []
     rows = await db.get_all_schedules()
     groups = await asyncio.to_thread(hero_schedule.group_lessons, rows)
-    active = [g for g in groups.values() if hero_schedule.is_active_now(g)]
-    ok_set = set(ok_emails)
-    same = [g for g in active if g["emails"] & ok_set]
-    pool_ = same or active
-    allowed = set().union(*[g["emails"] for g in pool_]) if pool_ else set()
-    return [e for e in comp if e in allowed]
+    return hero_schedule.companions_for_lesson(comp, groups, ok_emails, title)
 
 async def scan_companions(skip_emails, qr_url, title, ok_emails=()):
     try:
-        comp = await _companions_in_lesson(await get_companions(), ok_emails)
+        comp = await _companions_in_lesson(await get_companions(), ok_emails, title)
         now_ts = time.time()
         for kk in [kk for kk, t in _comp_marked.items() if now_ts - t > 1800]: _comp_marked.pop(kk, None)
         todo = [e for e in comp if e not in skip_emails and (qr_url, e) not in _comp_marked]
@@ -824,6 +819,19 @@ async def _after_scan(scanned_emails, ok_emails, qr_url, scanner_uid, title):
     attempted = await broadcast_to_lesson(scanned_emails, ok_emails, qr_url, scanner_uid) or set()
     await scan_companions(set(scanned_emails) | attempted, qr_url, title, ok_emails)
 
+async def _prime_companion_schedules(emails, max_age=12 * 3600):
+    """Hamroh qilib tanlangan akkauntlarning dars jadvalini (yo'q yoki 12 soatdan eski bo'lsa) Hero'dan yuklab bazaga saqlaydi."""
+    for e in emails:
+        try:
+            row = await db.get_schedule(e)
+            fresh = bool(row and row.get("raw") is not None and row.get("fetched_at") and (datetime.utcnow() - row["fetched_at"]).total_seconds() < max_age)
+            if fresh: continue
+            acc = await db.get_account_creds(e)
+            if acc: await refresh_schedule(e, acc.get("bearer_token"), acc.get("hero_password"))
+            await asyncio.sleep(random.uniform(0.5, 2))
+        except Exception as ex:
+            logger.warning(f"Hamroh jadvali yuklanmadi ({e}): {ex}")
+
 async def admin_companions(request):
     """Admin: hamroh akkauntlar ro'yxati + tanlash uchun barcha akkauntlar."""
     u_id, role = verify_token(request)
@@ -831,7 +839,8 @@ async def admin_companions(request):
     chosen = set(await get_companions())
     accs = sorted(await db.get_schedule_overview(), key=lambda r: ((r.get("full_name") or r["email"]).lower()))
     return web.json_response({"status": "success", "accounts": [
-        {"email": r["email"], "name": r.get("full_name"), "student_id": r.get("student_id"), "active": bool(r.get("active")), "chosen": r["email"] in chosen} for r in accs]})
+        {"email": r["email"], "name": r.get("full_name"), "student_id": r.get("student_id"), "active": bool(r.get("active")), "chosen": r["email"] in chosen,
+         "lessons": r.get("lesson_count"), "fetched_at": r.get("fetched_at"), "sched_error": r.get("error")} for r in accs]})
 
 async def admin_companions_save(request):
     u_id, role = verify_token(request)
@@ -842,7 +851,9 @@ async def admin_companions_save(request):
     known = {r["email"] for r in await db.get_schedule_overview()}
     clean = sorted({str(e).strip().lower() for e in emails} & {k.lower() for k in known})
     keep = [k for k in known if k.lower() in set(clean)]
+    before = set(await get_companions())
     await db.set_setting(COMPANION_KEY, json.dumps(sorted(keep)))
+    _bg(_prime_companion_schedules([e for e in keep if e not in before]))   # yangi hamrohlarning jadvali darhol saqlansin (haftalik yangilanishni kutmasdan)
     return web.json_response({"status": "success", "count": len(keep), "message": f"✅ {len(keep)} ta hamroh akkaunt saqlandi" if keep else "Hamroh akkauntlar ro'yxati bo'sh (o'chirilgan)"})
 
 # Feedback marshruti

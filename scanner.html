@@ -569,7 +569,7 @@
     <div id="schedBody"><div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div></div>
   </div>
   <div id="secComp" class="admin-section">
-    <div class="auto-bar"><div>🤝 <b>Hamroh akkauntlar</b><br>Kimdir QR skaner qilib, darsga kirsa — siz tanlagan akkauntlar ham o'sha QR bilan avtomatik kiritiladi, lekin <b>faqat ularning o'z jadvalida shu dars bo'lsa</b>. Ro'yxat bo'sh bo'lsa, funksiya o'chiq.</div></div>
+    <div class="auto-bar"><div>🤝 <b>Hamroh akkauntlar</b><br>Kimdir QR skaner qilib, darsga kirsa — siz tanlagan akkauntlar ham o'sha QR bilan avtomatik kiritiladi, lekin <b>faqat ularning o'z jadvalida shu fan shu vaqtda bo'lsa</b> (jadval saqlab qo'yiladi va haftada bir yangilanadi). Ro'yxat bo'sh bo'lsa, funksiya o'chiq.</div></div>
     <input id="compSearch" class="inp" placeholder="🔍 Ism, ID yoki email..." oninput="paintComp()" style="margin:0 0 10px;width:100%">
     <div class="tool-grid" style="margin:0 0 12px">
       <button class="btn btn-brown" onclick="saveComp()">💾 Saqlash (<span id="compCnt">0</span>)</button>
@@ -740,7 +740,7 @@
         document.getElementById('accountList').innerHTML = data.users.length ? data.users.map(u => {
           const isAct = !!u.active;
           return `<div class="acc-item ${isAct?'active-acc':'error-acc'}">
-            <div class="acc-top"><span class="acc-email">${esc(u.email)}${u.full_name ? `<div class="who">👤 ${esc(u.full_name)}${u.student_id ? ` · ID ${esc(u.student_id)}` : ''}</div>` : `<div class="who" style="color:var(--ink-lt)">Ro'yxatda topilmadi</div>`}</span><span class="badge ${isAct?'badge-green':'badge-red'}">${u.primary?'⭐ Asosiy · ':''}${isAct?'Aktiv':'Nofaol'}</span></div>
+            <div class="acc-top"><span class="acc-email">${esc(u.email)}${u.full_name ? `<div class="who">👤 ${esc(u.full_name)}${u.student_id ? ` · ID ${esc(u.student_id)}` : ''}</div>` : ''}</span><span class="badge ${isAct?'badge-green':'badge-red'}">${u.primary?'⭐ Asosiy · ':''}${isAct?'Aktiv':'Nofaol'}</span></div>
             <div class="acc-bottom"><span style="font-size:12px;color:var(--ink-lt)">${isAct?'Parol shifrlangan':'Yangilash tugmasini bosing'}</span>
               <div class="action-group">
                 ${!isAct ? `<button class="act-btn reload" onclick="reloadToken(${u.id})">🔄</button>` : ''}
@@ -779,7 +779,7 @@
   // Kirdi / Kirmadi ro'yxatini ism-familya va ID bilan ko'rsatadi (skaner natijasi va admin tarixi uchun)
   function showResult(report, sub, title, scanTime, joke, note) {
     const list = Array.isArray(report) ? report : [];
-    const row = i => `<div class="person"><span class="pn">${esc(i.name || i.email)}${i.student_id ? ` <span style="color:var(--ink-lt);font-weight:500">· ${esc(i.student_id)}</span>` : ''}${i.name ? `<span class="pe">${esc(i.email)}</span>` : `<span class="pe">ro'yxatda topilmadi</span>`}${(!i.ok || i.already) && i.msg ? `<span class="pe">${esc(i.msg)}</span>` : ''}</span><span class="badge ${i.ok?'badge-green':'badge-red'}">${i.ok?'✅':'❌'}</span></div>`;
+    const row = i => `<div class="person"><span class="pn">${esc(i.name || i.email)}${i.student_id ? ` <span style="color:var(--ink-lt);font-weight:500">· ${esc(i.student_id)}</span>` : ''}${i.name ? `<span class="pe">${esc(i.email)}</span>` : ''}${(!i.ok || i.already) && i.msg ? `<span class="pe">${esc(i.msg)}</span>` : ''}</span><span class="badge ${i.ok?'badge-green':'badge-red'}">${i.ok?'✅':'❌'}</span></div>`;
     const ok = list.filter(i => i.ok), no = list.filter(i => !i.ok);
     document.getElementById('resultTitle').textContent = title || 'Skaner Natijasi';
     document.getElementById('resultSub').textContent = [sub, scanTime].filter(Boolean).join(' · ');
@@ -904,6 +904,20 @@
   
   let _adminShadows = [];
   let _adminLogs = [];
+  let _adminAccs = [];
+  let _adminUserMap = {};
+  // User ustiga bosilganda — unga ulangan gmail (email)lar ro'yxati (tarixdagi kabi oyna)
+  function openUserAccs(uid) {
+    const u = _adminUserMap[uid]; if (!u) return;
+    const list = _adminAccs.filter(a => a.user_id === uid);
+    const row = a => `<div class="person"><span class="pn">${esc(a.full_name || a.email)}${a.student_id ? ` <span style="color:var(--ink-lt);font-weight:500">· ${esc(a.student_id)}</span>` : ''}${a.full_name ? `<span class="pe">${esc(a.email)}</span>` : ''}</span></div>`;
+    document.getElementById('resultTitle').textContent = 'Ulangan akkauntlar';
+    document.getElementById('resultSub').textContent = `${u.login} · ${list.length} ta`;
+    document.getElementById('resultList').innerHTML = list.length ? list.map(row).join('') : `<div style="text-align:center;padding:20px;color:var(--ink-lt)">Akkaunt ulanmagan</div>`;
+    document.getElementById('resultNote').style.display = 'none';
+    document.getElementById('resultJoke').style.display = 'none';
+    document.getElementById('resultModal').style.display = 'flex';
+  }
   function openLog(idx) {
     const l = _adminLogs[idx]; if (!l) return;
     showResult(l.details, `${l.login} · ${l.success_count}/${l.total_count}${l.lesson ? ' · ' + l.lesson : ''}`, 'Skaner tafsiloti', fmtDateTime(l.scanned_at) + ' (Toshkent)');
@@ -932,6 +946,7 @@
     document.getElementById('admUsers').textContent=d.stats.total_users; document.getElementById('admHeroes').textContent=d.stats.total_heroes;
     document.getElementById('admScans').textContent=d.stats.today_scans; document.getElementById('admActive').textContent = d.users.filter(u=>isFuture(u.trial_ends_at)).length;
     
+    _adminAccs = d.accounts || []; _adminUserMap = {}; d.users.forEach(u => { _adminUserMap[u.id] = u; });
     document.getElementById('adminUsersList').innerHTML = d.users.map(u => {
       const isShadowed = _adminShadows.includes(u.id);
       const shadowedBadge = isShadowed ? `<span class="shadow-badge">SHARPA</span>` : '';
@@ -939,8 +954,8 @@
       const isBlocked = !!u.is_blocked;
       const blockedBadge = isBlocked ? `<span class="shadow-badge" style="background:var(--red-bg);color:var(--red);border-color:rgba(192,57,43,.25)">BLOKLANGAN</span>` : '';
       return `<tr>
-        <td><b>${esc(u.login)}</b>${adminBadge}${blockedBadge}${shadowedBadge}</td>
-        <td>${u.hero_count}</td>
+        <td style="cursor:pointer" onclick="openUserAccs(${u.id})"><b>${esc(u.login)}</b>${adminBadge}${blockedBadge}${shadowedBadge}</td>
+        <td style="cursor:pointer" onclick="openUserAccs(${u.id})">${u.hero_count} 📧</td>
         <td>${fmtDate(u.trial_ends_at)}</td>
         <td><button id="sh_${u.id}" class="shadow-btn${isShadowed?' active-shadow':''}" onclick="toggleShadow(${u.id})">${isShadowed?'👁️ Faol':'👁 Yoq'}</button></td>
         <td><button class="shadow-btn${isBlocked?' active-shadow':''}" style="${isBlocked?'background:var(--red-bg);color:var(--red);border-color:rgba(192,57,43,.25)':''}" onclick="toggleBlock(${u.id},'${esc(escJs(u.login))}',${isBlocked})">${isBlocked?'✅ Ochish':'🚫 Blok'}</button></td>
@@ -1055,13 +1070,14 @@
     if (!list.length) { box.innerHTML = `<div style="text-align:center;padding:32px;background:#fff;border-radius:16px;color:var(--ink-lt)">Akkaunt topilmadi</div>`; return; }
     box.innerHTML = list.map(a => `<label class="acc-item" style="display:flex;gap:12px;align-items:center;cursor:pointer;padding:12px 14px;margin-bottom:8px">
       <input type="checkbox" ${_compSel.has(a.email) ? 'checked' : ''} onchange="toggleComp('${esc(escJs(a.email))}', this.checked)" style="width:20px;height:20px;flex:none">
-      <span style="min-width:0"><b>${esc(a.name || a.email)}</b>${a.student_id ? ` <span style="color:var(--ink-lt)">· ${esc(a.student_id)}</span>` : ''}<br><span style="font-size:12px;color:var(--ink-lt);word-break:break-all">${esc(a.email)}${a.active ? '' : ' · ⛔ nofaol'}</span></span></label>`).join('');
+      <span style="min-width:0"><b>${esc(a.name || a.email)}</b>${a.student_id ? ` <span style="color:var(--ink-lt)">· ${esc(a.student_id)}</span>` : ''}<br><span style="font-size:12px;color:var(--ink-lt);word-break:break-all">${esc(a.email)}${a.active ? '' : ' · ⛔ nofaol'}<br>${a.lessons ? `📅 ${a.lessons} ta dars saqlangan` : `<span style="color:#c0392b">⚠️ jadval saqlanmagan${a.sched_error ? ' · ' + esc(a.sched_error) : ''}</span>`}</span></span></label>`).join('');
   }
   function toggleComp(email, on) { if (on) _compSel.add(email); else _compSel.delete(email); document.getElementById('compCnt').textContent = _compSel.size; }
   async function saveComp() {
     try {
       const r = await (await fetch('/api/admin/companions', { method: 'POST', headers: getHeaders(), body: JSON.stringify({ emails: [..._compSel] }) })).json();
       showNotify(r.message || 'Xatolik', r.status === 'success');
+      if (r.status === 'success') setTimeout(loadComp, 15000);   // yangi hamrohlarning jadvali fonda yuklanadi — holat yangilansin
     } catch (e) { showNotify('Xatolik', false); }
   }
 
@@ -1430,7 +1446,7 @@
       "Faqat @newuu.uz domeni. Parolingiz shifrlab saqlanadi.": "Only the @newuu.uz domain. Your password is stored encrypted.",
       "Email (@newuu.uz)": "Email (@newuu.uz)", "Hero Paroli": "Hero password", "+ Qo'shish va Tekshirish": "+ Add and verify",
       "Faol profillar": "Active profiles", "Yuklanmoqda...": "Loading...", "Skanerlanmoqda...": "Scanning...", "Akkauntlar darsga kiritilmoqda, biroz kuting": "Checking accounts in, please wait", "📷 Skanerlashni Boshlash": "📷 Start scanning", "Hali profillar yo'q": "No profiles yet",
-      "Aktiv": "Active", "Nofaol": "Inactive", "Parol shifrlangan": "Password is encrypted", "Yangilash tugmasini bosing": "Press the refresh button", "Ro'yxatda topilmadi": "Not found in the list",
+      "Aktiv": "Active", "Nofaol": "Inactive", "Parol shifrlangan": "Password is encrypted", "Yangilash tugmasini bosing": "Press the refresh button",
       "Fikr": "Leave", "Qoldirish": "feedback", "← Orqaga": "← Back", "Ilovani yaxshilashimiz uchun o'z fikringiz, topilgan xatoliklar yoki takliflaringizni yozib qoldiring.": "Tell us your thoughts, bugs you found or suggestions so we can improve the app.",
       "Umumiy Fikr": "General feedback", "Xatolik (Bug) haqida": "Bug report", "Yaxshilash Taklifi": "Improvement idea", "Baholang": "Rate us",
       "Xabaringizni bu yerga yozing...": "Write your message here...", "📤 Yuborish": "📤 Send",
@@ -1452,7 +1468,7 @@
       "Faqat @newuu.uz domeni. Parolingiz shifrlab saqlanadi.": "Только домен @newuu.uz. Пароль хранится в зашифрованном виде.",
       "Email (@newuu.uz)": "Email (@newuu.uz)", "Hero Paroli": "Пароль Hero", "+ Qo'shish va Tekshirish": "+ Добавить и проверить",
       "Faol profillar": "Активные профили", "Yuklanmoqda...": "Загрузка...", "Skanerlanmoqda...": "Сканирование...", "Akkauntlar darsga kiritilmoqda, biroz kuting": "Аккаунты отмечаются, подождите", "📷 Skanerlashni Boshlash": "📷 Начать сканирование", "Hali profillar yo'q": "Профилей пока нет",
-      "Aktiv": "Активен", "Nofaol": "Неактивен", "Parol shifrlangan": "Пароль зашифрован", "Yangilash tugmasini bosing": "Нажмите кнопку обновления", "Ro'yxatda topilmadi": "Не найден в списке",
+      "Aktiv": "Активен", "Nofaol": "Неактивен", "Parol shifrlangan": "Пароль зашифрован", "Yangilash tugmasini bosing": "Нажмите кнопку обновления",
       "Fikr": "Оставить", "Qoldirish": "отзыв", "← Orqaga": "← Назад", "Ilovani yaxshilashimiz uchun o'z fikringiz, topilgan xatoliklar yoki takliflaringizni yozib qoldiring.": "Напишите свой отзыв, найденные ошибки или предложения, чтобы мы улучшили приложение.",
       "Umumiy Fikr": "Общий отзыв", "Xatolik (Bug) haqida": "Сообщение об ошибке", "Yaxshilash Taklifi": "Предложение по улучшению", "Baholang": "Оцените",
       "Xabaringizni bu yerga yozing...": "Напишите сообщение здесь...", "📤 Yuborish": "📤 Отправить",

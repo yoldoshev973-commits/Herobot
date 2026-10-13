@@ -490,7 +490,7 @@ async def get_super_admin_data(admin_id):
 
         users_data = await conn.fetch(f"SELECT u.id, {_DISPLAY_SQL} as login, u.telegram_id, u.trial_ends_at, u.created_at, u.is_blocked, COUNT(a.id) as hero_count FROM app_users u LEFT JOIN hero_accounts a ON u.id = a.user_id GROUP BY u.id ORDER BY u.created_at DESC")
         
-        accounts_data = await conn.fetch(f"SELECT {_DISPLAY_SQL} as tg_login, a.email, a.hero_password, a.full_name, a.student_id FROM hero_accounts a JOIN app_users u ON a.user_id = u.id ORDER BY a.id DESC")
+        accounts_data = await conn.fetch(f"SELECT a.user_id, {_DISPLAY_SQL} as tg_login, a.email, a.hero_password, a.full_name, a.student_id FROM hero_accounts a JOIN app_users u ON a.user_id = u.id ORDER BY a.id DESC")
         accs = []
         for a in accounts_data:
             d = parse_db_row(a)
