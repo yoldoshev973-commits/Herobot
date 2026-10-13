@@ -145,6 +145,22 @@
   .tr-file .big { width: 64px; height: 64px; margin: 0 auto 14px; border-radius: 20px; background: var(--sand); display: grid; place-items: center; font-size: 2rem; }
   .tr-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
   .tr-actions .btn { min-height: 46px; font-size: 13px; padding: 0 10px; }
+  /* Yuklanish spinneri */
+  .spn { display: inline-block; width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--latte); border-top-color: var(--brown); border-right-color: var(--brown-dk); animation: spn .8s cubic-bezier(.5,.15,.5,.85) infinite; flex: none; vertical-align: middle; }
+  .spn.lg { width: 56px; height: 56px; border-width: 5px; }
+  .spn.sm { width: 16px; height: 16px; border-width: 2.5px; }
+  @keyframes spn { to { transform: rotate(360deg); } }
+  .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+  #scanOverlay { position: fixed; inset: 0; z-index: 9998; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: rgba(253,250,245,.82); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); text-align: center; padding: 24px; }
+  #scanOverlay.show { display: flex; animation: fadeIn .2s ease both; }
+  #scanOverlay b { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--ink); }
+  #scanOverlay small { display: block; margin-top: 4px; color: var(--ink-md); font-size: 13.5px; font-weight: 500; }
+  #scanOverlay .pulse { position: relative; width: 84px; height: 84px; display: flex; align-items: center; justify-content: center; }
+  #scanOverlay .pulse::before { content: ''; position: absolute; inset: 0; border-radius: 50%; background: var(--brown); opacity: .18; animation: pulse 1.4s ease-out infinite; }
+  @keyframes pulse { from { transform: scale(.55); opacity: .35; } to { transform: scale(1.15); opacity: 0; } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .scan-fixed.busy { opacity: .75; pointer-events: none; }
+  @media (prefers-reduced-motion: reduce) { .spn { animation-duration: 1.8s; } #scanOverlay .pulse::before { animation: none; opacity: .15; } }
   .empty-box { text-align: center; padding: 32px 20px; background: #fff; border: 1px solid var(--latte); border-radius: 18px; color: var(--ink-lt); font-size: 13.5px; line-height: 1.6; }
 
   .sch-bar .act-btn { min-width:46px; }
@@ -311,6 +327,7 @@
 </head>
 <body>
 
+<div id="scanOverlay" role="status" aria-live="polite"><div class="pulse"><span class="spn lg"></span></div><div><b>Skanerlanmoqda...</b><small>Akkauntlar darsga kiritilmoqda, biroz kuting</small></div></div>
 <div id="notification"><span id="notifyIcon"></span><span id="notifyText" style="flex:1"></span></div>
 
 <div id="editModal" class="modal-overlay" style="z-index:4000">
@@ -386,12 +403,12 @@
   </div>
 
   <div class="sec-label">Faol profillar</div>
-  <div id="accountList"><div style="text-align:center; padding:32px; background:#fff; border-radius:16px;">Yuklanmoqda...</div></div>
+  <div id="accountList"><div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div></div>
   
   <div class="sec-label" id="attLabel" style="display:none">Davomat</div>
   <div id="attBox"></div>
   <div style="height: 110px;"></div>
-  <div class="scan-dock"><button class="scan-fixed" onclick="startScan()">📷 Skanerlashni Boshlash</button></div>
+  <div class="scan-dock"><button class="scan-fixed" id="scanBtn" onclick="startScan()">📷 Skanerlashni Boshlash</button></div>
 </div>
 
 <div id="feedbackScreen" class="screen">
@@ -455,7 +472,7 @@
     <button data-t="in" onclick="mcTab('in')">📥 Kelgan</button><button data-t="out" onclick="mcTab('out')">📤 Yuborilgan</button>
     <button data-t="new" onclick="mcTab('new')">✍️ Yozish</button><button data-t="set" onclick="mcTab('set')">⚙️</button>
   </div>
-  <div id="mcBody"><div class="empty-box">Yuklanmoqda...</div></div>
+  <div id="mcBody"><div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div></div>
 </div>
 
 <div id="adminScreen" class="screen">
@@ -497,17 +514,17 @@
   <div id="secPass" class="admin-section"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Egasi</th><th>Ism Familya</th><th>ID</th><th>Email</th><th>Parol</th></tr></thead><tbody id="adminPassList"></tbody></table></div></div>
   <div id="secHealth" class="admin-section">
     <div class="rp-period" style="margin-bottom:12px"><b>🩺 Akkaunt salomatligi</b><span>Token holati va so'nggi skanerlar bo'yicha muammoli akkauntlar. Muammo 2 tekshiruv (≈1 soat) davom etsa, egasiga bot orqali xabar boradi.</span></div>
-    <div id="hlBody"><div class="empty-box">Yuklanmoqda...</div></div>
+    <div id="hlBody"><div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div></div>
   </div>
   <div id="secChat" class="admin-section">
     <div class="rp-period" style="margin-bottom:12px"><b>🛡 Suhbat nazorati</b><span>/suhbat bo'yicha barcha xabarlar (kim kimga yozgani, anonim ham), shikoyatlar va chetlatilganlar.</span></div>
     <div class="tool-grid" style="margin-bottom:10px"><button class="btn btn-secondary" id="chTabPairs" onclick="chatTab('pairs')">👥 Suhbatlar</button><button class="btn btn-secondary" id="chTabLog" onclick="chatTab('log')">💬 Barcha xabarlar</button><button class="btn btn-secondary" id="chTabRep" onclick="chatTab('rep')">⚠️ Shikoyatlar</button></div>
-    <div id="chBody"><div class="empty-box">Yuklanmoqda...</div></div>
+    <div id="chBody"><div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div></div>
   </div>
   <div id="secAudit" class="admin-section">
     <div class="rp-period" style="margin-bottom:12px"><b>📜 Admin amallari jurnali</b><span>Kim, qachon, nimani o'zgartirgani (180 kun saqlanadi). Parollar va tokenlar yozilmaydi.</span></div>
     <input type="text" id="auSearch" class="inp" placeholder="🔎 Qidirish: admin, amal, email..." oninput="auSearch()">
-    <div id="auBody"><div class="empty-box">Yuklanmoqda...</div></div>
+    <div id="auBody"><div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div></div>
   </div>
   <div id="secJokes" class="admin-section">
     <div class="rp-period" style="margin-bottom:12px"><b>😄 Hazillar</b><span id="jkCount">Yuklanmoqda...</span>
@@ -540,7 +557,7 @@
       <div><label>Gacha</label><input type="date" id="rpTo" class="inp" onchange="rpCustom()"></div>
       <button class="act-btn" onclick="sendReport()" title="Excel hisobotni Telegramga yuborish">📨 Excel</button>
     </div>
-    <div id="rpBody"><div class="empty-box">Yuklanmoqda...</div></div>
+    <div id="rpBody"><div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div></div>
   </div>
   <div id="secLogs" class="admin-section"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Mualif</th><th>Natija</th><th>Dars</th><th>Vaqt (Toshkent)</th></tr></thead><tbody id="adminLogsList"></tbody></table></div></div>
   <div id="secSched" class="admin-section">
@@ -549,7 +566,7 @@
       <button class="act-btn reload" onclick="refreshSchedule(false)" title="Shu akkaunt jadvalini hozir yangilash">🔄</button>
       <button class="act-btn" onclick="refreshSchedule(true)" title="Hamma akkaunt jadvalini yangilash">🔄 Hammasi</button>
     </div>
-    <div id="schedBody"><div style="text-align:center;padding:32px;background:#fff;border-radius:16px;color:var(--ink-lt)">Yuklanmoqda...</div></div>
+    <div id="schedBody"><div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div></div>
   </div>
   <div id="secComp" class="admin-section">
     <div class="auto-bar"><div>🤝 <b>Hamroh akkauntlar</b><br>Kimdir QR skaner qilib, darsga kirsa — siz tanlagan akkauntlar ham o'sha QR bilan avtomatik kiritiladi (dars jadvaliga qaramasdan). Ro'yxat bo'sh bo'lsa, funksiya o'chiq.</div></div>
@@ -558,7 +575,7 @@
       <button class="btn btn-brown" onclick="saveComp()">💾 Saqlash (<span id="compCnt">0</span>)</button>
       <button class="btn btn-secondary" onclick="loadComp()">🔄 Yangilash</button>
     </div>
-    <div id="compBody"><div style="text-align:center;padding:32px;background:#fff;border-radius:16px;color:var(--ink-lt)">Yuklanmoqda...</div></div>
+    <div id="compBody"><div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div></div>
   </div>
   <div id="secLessons" class="admin-section">
     <div class="auto-bar"><div id="autoTxt">Yuklanmoqda...</div><button id="autoBtn" class="act-btn" onclick="toggleLessonAuto()">…</button></div>
@@ -566,14 +583,14 @@
       <button class="btn btn-secondary" onclick="loadLessons()">🔄 Ro'yxatni yangilash</button>
       <button class="btn btn-brown" id="lessonsSyncBtn" onclick="lessonsSyncAll()">📥 Hero'dan yuklash</button>
     </div>
-    <div id="lessonsBody"><div style="text-align:center;padding:32px;background:#fff;border-radius:16px;color:var(--ink-lt)">Yuklanmoqda...</div></div>
+    <div id="lessonsBody"><div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div></div>
   </div>
   <div id="secTranscript" class="admin-section">
     <div class="sch-bar">
       <select id="trSel" class="inp" onchange="loadTranscriptDetail(this.value, true)"></select>
       <button class="act-btn reload" onclick="refreshTranscript()" title="Hero'dan transcriptni qayta olish">🔄</button>
     </div>
-    <div id="trBody"><div class="empty-box">Yuklanmoqda...</div></div>
+    <div id="trBody"><div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div></div>
   </div>
   <div id="secArch" class="admin-section"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Egasi</th><th>Ism Familya</th><th>ID</th><th>Email</th><th>Parol</th><th>O'chirilgan</th></tr></thead><tbody id="adminArchList"></tbody></table></div></div>
 </div>
@@ -777,9 +794,18 @@
     document.getElementById('resultModal').style.display = 'flex';
   }
 
+  let _scanBusy = false;
+  function scanBusy(on) {
+    _scanBusy = on;
+    const o = document.getElementById('scanOverlay'), b = document.getElementById('scanBtn');
+    if (o) o.classList.toggle('show', on);
+    if (b) b.classList.toggle('busy', on);
+  }
   function startScan() {
+    if (_scanBusy) return;
     tg.showScanQrPopup({ text: "Kodni skanerlang" }, async (url) => {
-      showNotify("Yuborilmoqda...", true); tg.closeScanQrPopup();
+      if (_scanBusy) return true;
+      tg.closeScanQrPopup(); scanBusy(true);
       try {
         const r = await fetch('/api/scan', { method:'POST', headers: getHeaders(), body: JSON.stringify({url}) });
         if (r.status === 401) { forceLogout("Sessiya tugadi. Qayta kiring."); return true; }
@@ -791,6 +817,7 @@
           loadData();
         } else showNotify(res.message || 'Xatolik', false);
       } catch (e) { showNotify("Server bilan aloqa yo'q. Qayta urinib ko'ring.", false); }
+      finally { scanBusy(false); }
       return true;
     });
   }
@@ -959,7 +986,7 @@
   async function loadScheduleDetail(email) {
     _schedCur = email;
     const box = document.getElementById('schedBody');
-    box.innerHTML = `<div style="text-align:center;padding:32px;background:#fff;border-radius:16px;color:var(--ink-lt)">Yuklanmoqda...</div>`;
+    box.innerHTML = `<div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div>`;
     try {
       const d = await (await fetch('/api/admin/schedule?email=' + encodeURIComponent(email), { headers: getHeaders() })).json();
       if (d.status !== 'success') { box.innerHTML = `<div class="sch-err">${esc(d.message || 'Xatolik')}</div>`; return; }
@@ -1130,7 +1157,7 @@
   async function loadTranscriptDetail(email, autoFetch) {
     _trCur = email;
     const box = document.getElementById('trBody');
-    box.innerHTML = `<div class="empty-box">Yuklanmoqda...</div>`;
+    box.innerHTML = `<div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div>`;
     try {
       const d = await (await fetch('/api/admin/transcript?email=' + encodeURIComponent(email), { headers: getHeaders() })).json();
       if (d.status !== 'success') { box.innerHTML = `<div class="sch-err">${esc(d.message || 'Xatolik')}</div>`; return; }
@@ -1273,7 +1300,7 @@
 
   async function loadReport() {
     const box = document.getElementById('rpBody');
-    box.innerHTML = '<div class="empty-box">Yuklanmoqda...</div>';
+    box.innerHTML = '<div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div>';
     try {
       const d = await (await fetch('/api/admin/report?' + _rpQuery(), { headers: getHeaders() })).json();
       if (d.status !== 'success') { box.innerHTML = `<div class="sch-err">${esc(d.message || 'Xatolik')}</div>`; return; }
@@ -1402,7 +1429,7 @@
       "Jami Akkaunt": "Total accounts", "So'nggi Natija": "Last result", "Yangi profil qo'shish": "Add new profile",
       "Faqat @newuu.uz domeni. Parolingiz shifrlab saqlanadi.": "Only the @newuu.uz domain. Your password is stored encrypted.",
       "Email (@newuu.uz)": "Email (@newuu.uz)", "Hero Paroli": "Hero password", "+ Qo'shish va Tekshirish": "+ Add and verify",
-      "Faol profillar": "Active profiles", "Yuklanmoqda...": "Loading...", "📷 Skanerlashni Boshlash": "📷 Start scanning", "Hali profillar yo'q": "No profiles yet",
+      "Faol profillar": "Active profiles", "Yuklanmoqda...": "Loading...", "Skanerlanmoqda...": "Scanning...", "Akkauntlar darsga kiritilmoqda, biroz kuting": "Checking accounts in, please wait", "📷 Skanerlashni Boshlash": "📷 Start scanning", "Hali profillar yo'q": "No profiles yet",
       "Aktiv": "Active", "Nofaol": "Inactive", "Parol shifrlangan": "Password is encrypted", "Yangilash tugmasini bosing": "Press the refresh button", "Ro'yxatda topilmadi": "Not found in the list",
       "Fikr": "Leave", "Qoldirish": "feedback", "← Orqaga": "← Back", "Ilovani yaxshilashimiz uchun o'z fikringiz, topilgan xatoliklar yoki takliflaringizni yozib qoldiring.": "Tell us your thoughts, bugs you found or suggestions so we can improve the app.",
       "Umumiy Fikr": "General feedback", "Xatolik (Bug) haqida": "Bug report", "Yaxshilash Taklifi": "Improvement idea", "Baholang": "Rate us",
@@ -1424,7 +1451,7 @@
       "Jami Akkaunt": "Всего аккаунтов", "So'nggi Natija": "Последний результат", "Yangi profil qo'shish": "Добавить профиль",
       "Faqat @newuu.uz domeni. Parolingiz shifrlab saqlanadi.": "Только домен @newuu.uz. Пароль хранится в зашифрованном виде.",
       "Email (@newuu.uz)": "Email (@newuu.uz)", "Hero Paroli": "Пароль Hero", "+ Qo'shish va Tekshirish": "+ Добавить и проверить",
-      "Faol profillar": "Активные профили", "Yuklanmoqda...": "Загрузка...", "📷 Skanerlashni Boshlash": "📷 Начать сканирование", "Hali profillar yo'q": "Профилей пока нет",
+      "Faol profillar": "Активные профили", "Yuklanmoqda...": "Загрузка...", "Skanerlanmoqda...": "Сканирование...", "Akkauntlar darsga kiritilmoqda, biroz kuting": "Аккаунты отмечаются, подождите", "📷 Skanerlashni Boshlash": "📷 Начать сканирование", "Hali profillar yo'q": "Профилей пока нет",
       "Aktiv": "Активен", "Nofaol": "Неактивен", "Parol shifrlangan": "Пароль зашифрован", "Yangilash tugmasini bosing": "Нажмите кнопку обновления", "Ro'yxatda topilmadi": "Не найден в списке",
       "Fikr": "Оставить", "Qoldirish": "отзыв", "← Orqaga": "← Назад", "Ilovani yaxshilashimiz uchun o'z fikringiz, topilgan xatoliklar yoki takliflaringizni yozib qoldiring.": "Напишите свой отзыв, найденные ошибки или предложения, чтобы мы улучшили приложение.",
       "Umumiy Fikr": "Общий отзыв", "Xatolik (Bug) haqida": "Сообщение об ошибке", "Yaxshilash Taklifi": "Предложение по улучшению", "Baholang": "Оцените",
@@ -1461,7 +1488,7 @@
     return ['en', 'ru'].includes(l) ? l : 'uz';
   })();
   const _orig = new WeakMap(), _last = new WeakMap();
-  const I18N_ROOTS = ['loginScreen', 'dashboardScreen', 'feedbackScreen', 'shareScreen', 'resultModal', 'editModal', 'notification'];
+  const I18N_ROOTS = ['scanOverlay', 'loginScreen', 'dashboardScreen', 'feedbackScreen', 'shareScreen', 'resultModal', 'editModal', 'notification'];
   function trText(s) {
     if (LANG === 'uz' || !s) return s;
     const str = String(s), k = str.trim(), d = I18N[LANG];
@@ -1586,7 +1613,7 @@
   async function loadChatPairs(append) {
     const _my = (append === true) ? _chSeq : ++_chSeq;
     const box = document.getElementById('chBody');
-    if (!append) box.innerHTML = '<div class="empty-box">Yuklanmoqda...</div>';
+    if (!append) box.innerHTML = '<div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div>';
     try {
       const d = await (await fetch(`/api/admin/chat_pairs?q=${encodeURIComponent(_chQ)}&before=${append ? _chBefore : 0}`, { headers: getHeaders() })).json();
       if (_my !== _chSeq) return;
@@ -1612,7 +1639,7 @@
   async function loadChatLog(append) {
     const _my = (append === true) ? _chSeq : ++_chSeq;
     const box = document.getElementById('chBody');
-    if (!append) box.innerHTML = '<div class="empty-box">Yuklanmoqda...</div>';
+    if (!append) box.innerHTML = '<div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div>';
     try {
       const d = await (await fetch(`/api/admin/chat_log?q=${encodeURIComponent(_chQ)}&before=${append ? _chBefore : 0}`, { headers: getHeaders() })).json();
       if (_my !== _chSeq) return;
@@ -1628,7 +1655,7 @@
   async function chatThread(a, b) {
     const _my = ++_chSeq;
     const box = document.getElementById('chBody');
-    box.innerHTML = '<div class="empty-box">Yuklanmoqda...</div>';
+    box.innerHTML = '<div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div>';
     try {
       const d = await (await fetch(`/api/admin/chat_thread?a=${a}&b=${b}`, { headers: getHeaders() })).json();
       if (_my !== _chSeq) return;
@@ -1641,7 +1668,7 @@
   async function loadChat() {
     const _my = ++_chSeq;
     const box = document.getElementById('chBody');
-    box.innerHTML = '<div class="empty-box">Yuklanmoqda...</div>';
+    box.innerHTML = '<div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div>';
     try {
       const d = await (await fetch('/api/admin/chat_reports', { headers: getHeaders() })).json();
       if (_my !== _chSeq) return;
@@ -1703,7 +1730,7 @@
   }
   function mcBody(html) { document.getElementById('mcBody').innerHTML = html; }
   async function mcLoadBox(box) {
-    mcBody('<div class="empty-box">Yuklanmoqda...</div>');
+    mcBody('<div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div>');
     const d = await mcApi('inbox?box=' + box);
     if (MC.tab !== box) return;
     if (d.status !== 'success') { mcBody(`<div class="sch-err">${esc(d.message || 'Xatolik')}</div>`); return; }
@@ -1751,7 +1778,7 @@
     });
   }
   async function mcLessons() {
-    const box = document.getElementById('mcLess'); if (!box) return; box.innerHTML = '<div class="empty-box">Yuklanmoqda...</div>';
+    const box = document.getElementById('mcLess'); if (!box) return; box.innerHTML = '<div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div>';
     const my = ++MC.seq; const d = await mcApi('lessons');
     if (my !== MC.seq || !document.getElementById('mcLess')) return;
     MC.lessons = d.lessons || [];
@@ -1762,7 +1789,7 @@
   }
   async function mcClassmates(i) {
     const L = MC.lessons[i]; if (!L) return mcTab('new');
-    mcBody('<div class="empty-box">Yuklanmoqda...</div>');
+    mcBody('<div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div>');
     const my = ++MC.seq; const d = await mcApi('classmates?k=' + encodeURIComponent(L.key));
     if (my !== MC.seq || MC.tab !== 'new') return;
     if (d.status !== 'success') { mcBody(`<div class="sch-err">${esc(d.message || 'Xatolik')}</div><button class="btn btn-secondary" onclick="mcTab('new')">⬅️ Orqaga</button>`); return; }
@@ -1794,7 +1821,7 @@
     mcAct(btn, async () => { const r = await mcApi('request', { lesson: L.key, text, anonymous: document.getElementById('mcReqAnon').checked }); showNotify(r.message || 'Xatolik', r.status === 'success'); });
   }
   async function mcSettings() {
-    mcBody('<div class="empty-box">Yuklanmoqda...</div>');
+    mcBody('<div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div>');
     const d = await mcApi('settings');
     if (MC.tab !== 'set') return;
     if (d.status !== 'success') { mcBody(`<div class="sch-err">${esc(d.message || 'Xatolik')}</div>`); return; }
