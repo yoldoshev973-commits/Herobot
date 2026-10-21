@@ -5,7 +5,6 @@ dars boshlanishidan 30 daqiqa oldin yoki tugaguncha akkaunt skaner orqali kirgan
 Faqat shu bot orqali skaner qilingan darslar ko'rinadi.
 """
 import asyncio
-import re
 import time
 from datetime import datetime, timedelta
 
@@ -73,7 +72,7 @@ async def _scan_items():
             if isinstance(items, list):
                 auto = str(r["lesson"] or "").endswith((" · avto", " · hamroh"))   # avto-yuborish: kirmaganlar ko'pincha boshqa guruh — akkaunt xatosi emas
                 out.append((r["scanned_at"] + TZ_OFF, [(i.get("email"), bool(i.get("ok")), i.get("msg")) for i in items
-                                                       if isinstance(i, dict) and i.get("email") and not (i.get("reason") == "not_in_lesson" and not i.get("ok")) and not (auto and not i.get("ok"))]))
+                                                       if isinstance(i, dict) and i.get("email") and not (i.get("reason") in ("not_in_lesson", "qr_invalid") and not i.get("ok")) and not (auto and not i.get("ok"))]))
         return out
     rows = await asyncio.to_thread(parse)
     _cache["logs"] = (time.time(), rows)
@@ -176,7 +175,6 @@ async def health_overview():
                      "msg": s["msg"] if s else None, "last": s["last"].strftime("%d.%m.%Y %H:%M") if s and s["last"] else None,
                      "last_ok": s["last_ok"].strftime("%d.%m.%Y %H:%M") if s and s["last_ok"] else None})
     # bugungi 0/N skanerlar
-    today = now_local().date()
     zero_today = 0
     async with db.pool.acquire() as conn:
         t0 = datetime.utcnow() + TZ_OFF   # Toshkent hozirgi vaqti

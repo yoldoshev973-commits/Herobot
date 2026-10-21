@@ -15,7 +15,7 @@ import re
 from datetime import timedelta
 
 from aiogram import F
-from aiogram.filters import Command, CommandObject
+from aiogram.filters import Command
 from aiogram.types import (BotCommand, BotCommandScopeDefault, CallbackQuery, InlineKeyboardButton,
                            InlineKeyboardMarkup, Message)
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter

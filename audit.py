@@ -11,14 +11,14 @@ import database as db
 
 logger = logging.getLogger(__name__)
 
-SENSITIVE_GET = {"/api/admin/transcript", "/api/admin/transcript_file", "/api/admin/schedule"}
+SENSITIVE_GET = {"/api/admin/transcript", "/api/admin/transcript_file", "/api/admin/schedule", "/api/admin/acct_detail"}
 HIDE_KEYS = {"password", "pass", "token", "text", "code", "data", "raw", "hero_password", "message", "new_pass", "new_password", "pwd", "bearer", "authorization", "secret"}
 LABELS = {
-    "/api/admin/set_shadow": "Shadow nishon o'zgartirildi", "/api/admin/extend": "Obuna muddati uzaytirildi", "/api/admin/toggle_block": "Foydalanuvchi bloklandi/blokdan chiqarildi",
+    "/api/admin/extend": "Obuna muddati uzaytirildi", "/api/admin/toggle_block": "Foydalanuvchi bloklandi/blokdan chiqarildi",
     "/api/admin/backup": "Zaxira olindi", "/api/admin/import": "Zaxiradan import qilindi", "/api/admin/sync_usernames": "Username'lar yangilandi",
     "/api/admin/lessons_toggle": "Avto-yuborish yoqildi/o'chirildi", "/api/admin/schedule_refresh": "Jadval yangilandi", "/api/admin/transcript_refresh": "Transcript yangilandi",
     "/api/admin/transcript_send": "Transcript fayli yuborildi", "/api/admin/transcript_file": "Transcript fayli ko'rildi", "/api/admin/transcript": "Transcript ko'rildi",
-    "/api/admin/schedule": "Dars jadvali ko'rildi", "/api/admin/report_send": "Hisobot Excel yuborildi", "/api/admin/jokes_import": "Hazillar qo'shildi/almashtirildi",
+    "/api/admin/schedule": "Dars jadvali ko'rildi", "/api/admin/acct_detail": "Akkaunt tarixi ko'rildi", "/api/admin/report_send": "Hisobot Excel yuborildi", "/api/admin/jokes_import": "Hazillar qo'shildi/almashtirildi",
     "/api/admin/jokes_update": "Hazil tahrirlandi", "/api/admin/jokes_delete": "Hazil o'chirildi", "/api/admin/jokes_send": "Hazillar fayli yuborildi",
     "/api/admin/health_fix": "Akkauntlar tuzatildi (qayta login)", "/api/admin/health_delete": "Akkaunt o'chirildi (admin, arxivga)", "/api/admin/chat_ban": "Suhbatdan chetlatildi", "/api/admin/chat_unban": "Suhbatdan chetlatish olib tashlandi",
     "/api/admin/chat_review": "Shikoyat ko'rib chiqildi",

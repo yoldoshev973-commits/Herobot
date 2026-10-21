@@ -1,7 +1,11 @@
 import asyncio
 import os
+import sys
+import hashlib
+import hmac
 import logging
 import time
+import calendar
 import random
 import json
 import re
@@ -23,7 +27,6 @@ import hero_transcript
 import jokes
 import friends
 import notify
-import stats
 import audit
 import extras
 import i18n
@@ -34,10 +37,33 @@ def tashkent_now():
     """Hozirgi Toshkent vaqti (server UTC'da ishlaydi, shuning uchun +5 soat qo'shamiz)."""
     return datetime.utcnow() + TASHKENT_OFFSET
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, stream=sys.stdout)   # stdout: Railway INFO loglarni "error" deb ko'rsatmasin
+
+
+class _MaskWebhookPath(logging.Filter):
+    """aiohttp access log to'liq URL'ni yozadi — webhook yo'lidagi maxfiy qismni loglarda yashiramiz."""
+    _rx = re.compile(r"(/webhook/)[^\s\"?]+")
+
+    def filter(self, record):
+        try:
+            record.msg = self._rx.sub(r"\1***", str(record.msg))
+            if record.args:
+                record.args = tuple(self._rx.sub(r"\1***", a) if isinstance(a, str) else a for a in record.args)
+        except Exception:
+            pass
+        return True
+
+
+for _n in ("aiohttp.access", "aiohttp.server"):
+    logging.getLogger(_n).addFilter(_MaskWebhookPath())
 logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+# Webhook yo'li bot tokenidan ALOHIDA bo'lishi kerak (token URL va access loglarda ochiq qolmasin).
+# WEBHOOK_SECRET berilmasa, tokendan bir tomonlama hash olinadi (token tiklanmaydi, lekin yo'l barqaror).
+WEBHOOK_SECRET = (os.getenv("WEBHOOK_SECRET") or "").strip() or (
+    hashlib.sha256(f"herobot-webhook:{BOT_TOKEN}".encode()).hexdigest()[:40] if BOT_TOKEN else "")
+WEBHOOK_HEADER_SECRET = hashlib.sha256(f"herobot-hdr:{WEBHOOK_SECRET}".encode()).hexdigest()[:48]   # faqat harf/raqam (Telegram talabi)
 ADMIN_ID = int(os.getenv("ADMIN_ID") or 0) 
 raw_url = os.getenv("WEBAPP_URL", "").rstrip('/')
 WEBAPP_URL = f"https://{raw_url.replace('https://', '').replace('http://', '')}" if raw_url else ""
@@ -46,7 +72,7 @@ PORT = int(os.getenv("PORT") or 8080)
 JWT_SECRET = os.getenv("JWT_SECRET")
 if not JWT_SECRET:
     JWT_SECRET = secrets.token_hex(32)
-    logger.warning(f"⚠️ DIQQAT! JWT_SECRET topilmadi. Vaqtinchalik tasodifiy kalit ishlatilmoqda (qayta ishga tushirilganda barcha tokenlar bekor bo'ladi). .env faylga shuni qo'shing:\nJWT_SECRET={JWT_SECRET}")
+    logger.warning("⚠️ DIQQAT! JWT_SECRET o'rnatilmagan: vaqtinchalik tasodifiy kalit ishlatilmoqda, har restartda hamma qayta kirishi kerak bo'ladi. Railway Variables'ga JWT_SECRET qo'shing (kalit logga yozilmaydi).")
 
 # Faqat shu domenlarga chiquvchi so'rovlarga ruxsat beriladi (SSRF va parolni tashqariga oqizishning oldini olish uchun)
 ALLOWED_SCAN_HOST_SUFFIX = "hero.study"
@@ -88,6 +114,7 @@ ADMIN_TG_IDS = set()     # adminlarning Telegram ID lari (bot buyruqlari uchun)
 _admins_loaded = False
 BLOCKED_USER_IDS = set() # bloklangan foydalanuvchilarning app_users.id lari
 _blocked_loaded = False
+_PW_CHANGED = {}         # {app_users.id: parol almashgan vaqt (epoch)} — eski JWT sessiyalarni yopish uchun
 
 async def refresh_admins():
     """Adminlar ro'yxatini bazadan qayta o'qiydi. Bosh admin (ADMIN_ID) doim ro'yxatda."""
@@ -105,6 +132,13 @@ async def refresh_blocked_users():
     _blocked_loaded = True
     logger.info(f"🚫 Bloklangan foydalanuvchilar: {len(BLOCKED_USER_IDS)} ta")
 
+async def refresh_pw_changed():
+    """Parol almashtirilgan vaqtlarni bazadan qayta o'qiydi (startda va /reset dan keyin)."""
+    global _PW_CHANGED
+    rows = await db.get_pw_changed()
+    _PW_CHANGED = {uid: calendar.timegm(dt.utctimetuple()) for uid, dt in rows.items() if dt}   # naive UTC -> epoch
+    logger.info(f"🔑 Parol almashtirgan foydalanuvchilar: {len(_PW_CHANGED)} ta")
+
 def verify_token(request):
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "): return None, None
@@ -113,10 +147,13 @@ def verify_token(request):
         payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
         u_id = payload.get("user_id")
         if _blocked_loaded and u_id in BLOCKED_USER_IDS: return None, None   # bloklangan — eski token ham darhol kuchini yo'qotadi
+        if u_id in _PW_CHANGED:   # parol almashgan: undan oldin berilgan (yoki iat'siz) token yaroqsiz
+            iat = payload.get("iat")
+            if not isinstance(iat, (int, float)) or iat < _PW_CHANGED[u_id]: return None, None
         # Rolni tokendan emas, JORIY adminlar ro'yxatidan olamiz: admin huquqi olib tashlansa, eski token ham darhol kuchini yo'qotadi.
         role = ("super_admin" if u_id in ADMIN_USER_IDS else "user") if _admins_loaded else payload.get("role")
         return u_id, role
-    except: return None, None
+    except Exception: return None, None
 
 async def verify_hero_account(email, password):
     login_url = "https://api.newuzbekistan.hero.study/v1/users/login?lang=en"
@@ -164,7 +201,8 @@ async def _extract_lesson(resp, qr_url):
 
 _URL_ID_PARAMS = ("lesson", "lesson_id", "quiz", "quiz_id", "code", "session", "session_id", "topic")
 _GENERIC_PATH_WORDS = {"scan", "check", "verify", "mark", "attend", "attendance", "confirm", "submit",
-                       "qr", "validate", "log", "v1", "v2", "api", "lang", "en", "uz", "ru"}
+                       "qr", "validate", "log", "v1", "v2", "api", "lang", "en", "uz", "ru",
+                       "code", "active", "code-active", "code_active", "codeactive"}
 
 def _lesson_from_url(url):
     """QR javobida ism topilmasa, URL'dan foydali bo'lak ajratib olamiz — 'check'/'scan' kabi umumiy
@@ -180,7 +218,7 @@ def _lesson_from_url(url):
             if seg.lower() in _GENERIC_PATH_WORDS or seg.isdigit() and len(seg) <= 2: continue
             cleaned = re.sub(r"[-_]+", " ", seg).strip()
             if cleaned: return cleaned[:80]
-        return unquote(segs[-1])[:80] if segs else None   # hech biri mos kelmasa, oxirgisini baribir qaytaramiz
+        return None   # faqat umumiy so'zlar qolsa — noto'g'ri nom ('code active') yozmaymiz, tarixda "—" chiqadi
     except Exception:
         return None
 
@@ -193,6 +231,7 @@ def _why_lines(items, lg):
     for i in items:
         if not i["ok"] and i.get("reason"): c[i["reason"]] = c.get(i["reason"], 0) + 1
     out = []
+    if c.get("qr_invalid"): out.append(i18n.t(lg, "why_qr_invalid"))
     if c.get("not_in_lesson"):
         all_failed_same = not any(i["ok"] for i in items) and c["not_in_lesson"] == sum(c.values())
         out.append(i18n.t(lg, "why_all_not_in") if all_failed_same else i18n.t(lg, "why_not_in", n=c["not_in_lesson"]))
@@ -211,6 +250,24 @@ async def _token_probe(token):
     if err == "TOKEN_EXPIRED": return False
     return None
 
+async def _lesson_from_schedules(emails):
+    """Dars nomi QR/URL'dan topilmasa: akkauntlar jadvalidan HOZIR ketayotgan darsni oladi (eng ko'p akkaunt tegishlisi). Topilmasa None."""
+    try:
+        want = set(emails)
+        rows = [(e, raw) for e, raw in await db.get_all_schedules() if e in want]
+        if not rows: return None
+        groups = await asyncio.to_thread(hero_schedule.group_lessons, rows)
+        live = [g for g in groups.values() if hero_schedule.is_active_now(g)]
+        if not live: return None
+        return (max(live, key=lambda g: len(g["emails"] & want)).get("title") or None)
+    except Exception as e:
+        logger.warning(f"Dars nomini jadvaldan aniqlab bo'lmadi: {e}"); return None
+
+def _mask_email(email):
+    """Logga yozish uchun: e***@domen (to'liq email logga tushmasin)."""
+    e = str(email or ""); name, _, dom = e.partition("@")
+    return f"{name[:1]}***@{dom}" if dom else "***"
+
 async def scan_task(session, acc, qr_url, db_callback):
     """Bitta akkauntni QR bilan darsga kiritadi. Muvaffaqiyatsiz bo'lsa qayta urinadi (har safar biroz kutib).
     Har bir xatoda TOKEN TEKSHIRILADI: token ishlayotgan bo'lsa-yu Hero baribir rad etsa — bu dars shu akkauntning jadvalida yo'q
@@ -220,6 +277,7 @@ async def scan_task(session, acc, qr_url, db_callback):
     if not _token_ok(token):
         return {"email": email, "ok": False, "msg": "Nofaol akkaunt", "reason": "token"}
     relogged, status, valid = False, 0, None
+    qr_invalid = stu_nf = False   # Hero 4xx javob matnidan: QR topilmadi / talaba jadvalda yo'q
     for attempt in range(SCAN_ATTEMPTS):
         status = 0
         try:
@@ -229,13 +287,22 @@ async def scan_task(session, acc, qr_url, db_callback):
                 status = rp.status
                 if status in (200, 201):
                     lesson = await _extract_lesson(rp, qr_url)
-                    if lesson: _qr_lesson[qr_url] = lesson
+                    if lesson:
+                        if len(_qr_lesson) > 200: _qr_lesson.pop(next(iter(_qr_lesson)), None)   # xotira cheksiz o'smasin
+                        _qr_lesson[qr_url] = lesson
                     return {"email": email, "ok": True, "lesson": lesson, "attempts": attempt + 1}
-                body = (await rp.text())[:160].replace("\n", " ")
+                try: body = (await rp.text())[:300].replace("\n", " ")
+                except Exception: body = ""   # javob matnini o'qib bo'lmasa — e'tiborsiz
+                if 400 <= status < 500 and status not in (408, 429):
+                    low = body.lower()
+                    logger.info(f"Skaner 4xx: {_mask_email(email)} HTTP {status} {body[:120]}")   # token/parol logga YOZILMAYDI
+                    if "qr code not found" in low: qr_invalid = True
+                    elif "student not found" in low: stu_nf = True
                 if status == 429:
                     try: await asyncio.sleep(min(float(rp.headers.get("Retry-After", 2)), 6))
                     except Exception: await asyncio.sleep(2)
-            logger.warning(f"Skaner {email}: urinish {attempt + 1}/{SCAN_ATTEMPTS} → HTTP {status} {body}")
+            logger.warning(f"Skaner {_mask_email(email)}: urinish {attempt + 1}/{SCAN_ATTEMPTS} → HTTP {status} {body[:160]}")
+            if qr_invalid: break   # QR topilmadi/eskirgan — qayta urinish foydasiz
         except Exception as e:
             logger.warning(f"Skaner xatosi ({email}) urinish {attempt + 1}/{SCAN_ATTEMPTS}: {e}")
         if attempt == SCAN_ATTEMPTS - 1: break
@@ -257,12 +324,14 @@ async def scan_task(session, acc, qr_url, db_callback):
                 return {"email": email, "ok": False, "reason": "network" if net else "login",
                         "msg": "Hero bilan ulanib bo'lmadi" if net else "Token ishlamayapti: login/parol xato"}
     # --- barcha urinishlar tugadi: sababini aniqlaymiz
+    if qr_invalid:
+        return {"email": email, "ok": False, "reason": "qr_invalid", "msg": "QR kod topilmadi yoki eskirgan"}
     if status == 0:
         return {"email": email, "ok": False, "reason": "network", "msg": f"Hero bilan ulanib bo'lmadi · {SCAN_ATTEMPTS} marta urinildi"}
     if status >= 500 or status in (408, 429):
         return {"email": email, "ok": False, "reason": "hero", "msg": f"Hero serveri javob bermadi (HTTP {status}) · {SCAN_ATTEMPTS} marta urinildi"}
     if valid is None: valid = await _token_probe(token)
-    if valid is True:
+    if valid is True or (stu_nf and valid is None):   # "Student not found" — Hero talabani shu darsda topmadi
         return {"email": email, "ok": False, "reason": "not_in_lesson", "msg": f"Token ishlayapti, lekin bu dars akkaunt jadvalida yo'q (Hero: HTTP {status})"}
     if valid is False:
         return {"email": email, "ok": False, "reason": "token", "msg": f"Token ishlamayapti (HTTP {status})"}
@@ -533,7 +602,7 @@ async def auth_login(request):
         elif not user_data: return web.json_response({"status": "error", "message": msg}, status=401)
         
         token = jwt.encode({
-            "user_id": user_data['id'], "role": user_data['role'],
+            "user_id": user_data['id'], "role": user_data['role'], "iat": int(time.time()),
             "exp": datetime.utcnow() + timedelta(days=30)
         }, JWT_SECRET, algorithm="HS256")
         
@@ -630,6 +699,7 @@ async def do_scan(request):
     qr_url = data.get("url")
     if not qr_url or not is_allowed_scan_url(qr_url):
         return web.json_response({"status": "error", "message": "Noto'g'ri yoki ruxsat etilmagan URL"}, status=400)
+    logger.info(f"🔎 QR URL (user {u_id}): {qr_url[:500]}")   # QR tuzilishini tahlil qilish uchun (admin paneldagi tarixda ham saqlanadi)
 
     user_accounts = await db.get_active_tokens(u_id)
     if not user_accounts: return web.json_response({"status": "error", "message": "Sizda akkaunt yo'q"})
@@ -649,6 +719,7 @@ async def do_scan(request):
             
     success, total, duration, report, lesson = await mark_all_accounts_smart(all_accounts, qr_url, update_token)
     lesson = lesson or _qr_lesson.get(qr_url) or _lesson_from_url(qr_url)   # tarixda "—" chiqmasin
+    if not lesson: lesson = await _lesson_from_schedules({a['email'] for a in user_accounts})   # 0/N bo'lsa ham dars nomi chiqsin
     if total == 0: return web.json_response({"status": "error", "message": "Akkauntlaringiz NOFAOL!"})
     ok_emails = {r['email'] for r in report if r['ok']}
     if ok_emails: _bg(_after_scan({a['email'] for a in all_accounts}, ok_emails, qr_url, u_id, lesson))   # fonda: javobni kutdirmaydi
@@ -679,7 +750,7 @@ async def do_scan(request):
             user_report = [r for r in user_report if r not in skipped]
             user_total = max(user_success, user_total - len(skipped))
 
-    await db.save_detailed_scan(u_id, user_success, user_total, duration, user_report, lesson)
+    await db.save_detailed_scan(u_id, user_success, user_total, duration, user_report, lesson, qr_url)
     jid, joke = (await jokes.next_joke_item()) if user_success > 0 else (None, None)
     tg_id = await db.get_telegram_id(u_id)
     lg = await notify.lang_of(tg_id) if tg_id else "uz"
@@ -767,7 +838,7 @@ async def _scan_extra(emails, qr_url, title, tag, on_missing=None):
             items.append({"email": a["email"], "ok": bool(res[a["email"]]), "name": name, "student_id": sid, "label": person_label(name, sid, a["email"])})
         if not items: continue
         n_ok = sum(1 for i in items if i["ok"])
-        try: await db.save_detailed_scan(uid, n_ok, len(items), duration, items, f"{title} · {tag}"[:160])
+        try: await db.save_detailed_scan(uid, n_ok, len(items), duration, items, f"{title} · {tag}"[:160], qr_url)
         except Exception as e: logger.warning(f"Qo'shimcha skaner logi yozilmadi: {e}")
         if bot and n_ok:
             try:
@@ -856,6 +927,40 @@ async def admin_companions_save(request):
     _bg(_prime_companion_schedules([e for e in keep if e not in before]))   # yangi hamrohlarning jadvali darhol saqlansin (haftalik yangilanishni kutmasdan)
     return web.json_response({"status": "success", "count": len(keep), "message": f"✅ {len(keep)} ta hamroh akkaunt saqlandi" if keep else "Hamroh akkauntlar ro'yxati bo'sh (o'chirilgan)"})
 
+# --- AKKAUNT TARIXI (admin): qaysi akkaunt bot orqali qaysi darslarga kirgani ---
+async def admin_acct_search(request):
+    u_id, role = verify_token(request)
+    if not u_id or role != "super_admin": return web.json_response({"status": "error", "message": "Ruxsat yo'q"}, status=403)
+    return web.json_response({"status": "success", "accounts": await db.search_accounts(request.query.get("q", ""))})
+
+async def admin_acct_detail(request):
+    u_id, role = verify_token(request)
+    if not u_id or role != "super_admin": return web.json_response({"status": "error", "message": "Ruxsat yo'q"}, status=403)
+    email = (request.query.get("email") or "").strip().lower()
+    if not email or len(email) > 200: return web.json_response({"status": "error", "message": "email kerak"}, status=400)
+    data = await db.get_account_detail(email)
+    if not data: return web.json_response({"status": "error", "message": "Akkaunt topilmadi"}, status=404)
+    upcoming = []   # shu akkaunt jadvalidagi bugungi/yaqin darslar (jadval bo'lmasa — bo'sh ro'yxat)
+    try:
+        sched = await db.get_schedule(email)
+        if sched and sched.get("raw") is not None:
+            today = hero_schedule.today_str()
+            lessons = hero_schedule.normalize(db._jsonish(sched["raw"]))
+            upcoming = [{k: l.get(k) for k in ("date", "start", "end", "title", "room")} for l in lessons if l.get("date") and l["date"] >= today][:12]
+    except Exception as e: logger.warning(f"Akkaunt tarixi: jadval o'qilmadi: {e}")
+    data["upcoming"] = upcoming
+    return web.json_response({"status": "success", **data})
+
+_last_activity_prune = None
+async def _prune_activity_tick():
+    """Kuniga bir marta: 365 kundan eski akkaunt tarixi yozuvlarini o'chiradi (arzon DELETE)."""
+    global _last_activity_prune
+    today = tashkent_now().strftime("%Y-%m-%d")
+    if _last_activity_prune == today: return
+    n = await db.prune_account_activity(365)
+    _last_activity_prune = today
+    if n: logger.info(f"🧹 Akkaunt tarixi: {n} ta eski yozuv o'chirildi")
+
 # Feedback marshruti
 async def submit_feedback(request):
     u_id, _ = verify_token(request)
@@ -887,17 +992,33 @@ async def get_admin_all_data(request):
     data["admin_ids"] = sorted(ADMIN_USER_IDS)
     return web.json_response({"status": "success", "data": data})
 
-async def admin_set_shadow(request):
-    u_id, role = verify_token(request)
-    if role != "super_admin": return web.json_response({"status": "error"}, status=403)
-    await db.set_shadow_target(u_id, (await request.json()).get("target_id"))
-    return web.json_response({"status": "success"})
-
 async def admin_extend_trial(request):
+    """Admin panelidagi '+30 kun' tugmasi. Cheksiz muddatli foydalanuvchiga tegmaydi."""
     u_id, role = verify_token(request)
-    if role != "super_admin": return web.json_response({"status": "error"}, status=403)
-    await db.extend_user_trial((await request.json()).get("target_id"))
-    return web.json_response({"status": "success"})
+    if not u_id: return web.json_response({"status": "error", "message": "Kirish talab qilinadi"}, status=401)
+    if role != "super_admin": return web.json_response({"status": "error", "message": "Ruxsat yo'q"}, status=403)
+    try: data = await request.json()
+    except Exception: return web.json_response({"status": "error", "message": "Noto'g'ri so'rov"}, status=400)
+    raw = data.get("target_id") if isinstance(data, dict) else None
+    try:
+        if isinstance(raw, bool) or raw is None: raise ValueError
+        target_id = int(raw)
+    except (TypeError, ValueError): return web.json_response({"status": "error", "message": "target_id noto'g'ri"}, status=400)
+    try:
+        days = int(data.get("days", 30))
+        if isinstance(data.get("days"), bool) or not (1 <= days <= 365): raise ValueError
+    except (TypeError, ValueError): return web.json_response({"status": "error", "message": "Kunlar soni 1 dan 365 gacha bo'lishi kerak"}, status=400)
+    res = await db.extend_user_trial(target_id, days)
+    if not res["found"]: return web.json_response({"status": "error", "message": "Foydalanuvchi topilmadi"}, status=404)
+    if res["unlimited"]:
+        return web.json_response({"status": "success", "message": "Muddat cheklanmagan — o'zgartirilmadi", "trial_ends_at": None, "unlimited": True})
+    new_end = res["trial_ends_at"]
+    try:   # Telegram xabari xato bersa ham javobga ta'sir qilmaydi; bloklangan foydalanuvchiga yuborilmaydi
+        target = await db.get_user_contact(target_id)
+        if bot and target and target.get("telegram_id") and not target.get("is_blocked"):
+            await bot.send_message(target["telegram_id"], f"✅ Obunangiz {days} kunga uzaytirildi. Yangi muddat: {(new_end + TASHKENT_OFFSET).strftime('%d-%m-%Y')}")
+    except Exception as e: logger.warning(f"Obuna uzaytirish xabari yuborilmadi (user {target_id}): {e}")
+    return web.json_response({"status": "success", "message": f"Obuna {days} kunga uzaytirildi", "trial_ends_at": new_end.isoformat(), "unlimited": False})
 
 async def admin_toggle_block(request):
     """Admin panelidagi 'Bloklash' tugmasi. Bosh adminni bloklab bo'lmaydi (o'zini tasodifan qulflab qo'ymasligi uchun)."""
@@ -1415,6 +1536,27 @@ async def _run_broadcast(admin_chat, users, text):
         msg += f"\n❌ Yetib bormadi: {len(failed)} ta (botni bloklagan bo'lishi mumkin): {shown}"
     await _send_html(admin_chat, _html.escape(msg, quote=False))
 
+# ---- /reset: tasdiq + cheklov (xotirada, _prune_fails uslubida chegaralangan) ----
+RESET_CONFIRM_TTL = 300        # tasdiq 5 daqiqadan keyin eskiradi
+RESET_MIN_GAP = 60             # bir foydalanuvchi uchun 60 soniyada 1 marta
+RESET_HOUR_MAX = 5             # soatiga 5 martagacha
+_reset_pending = {}            # {tg_id: (so'rov vaqti, tasdiq xabari message_id)}
+_reset_hits = {}               # {tg_id: [haqiqiy almashtirish vaqtlari]}
+BLOCKED_TEXT = "🚫 Sizga botdan foydalanish taqiqlangan."
+
+def _reset_limit_msg(tg_id, record=False):
+    """Cheklovdan oshgan bo'lsa foydalanuvchiga xabar matnini qaytaradi, aks holda None. record=True — urinishni hisobga yozadi."""
+    now = time.time()
+    hits = [t for t in _reset_hits.get(tg_id, []) if now - t < 3600]
+    msg = None
+    if hits and now - hits[-1] < RESET_MIN_GAP: msg = f"⏳ Iltimos, {int(RESET_MIN_GAP - (now - hits[-1])) + 1} soniyadan keyin qayta urinib ko'ring."
+    elif len(hits) >= RESET_HOUR_MAX: msg = f"⏳ Soatiga {RESET_HOUR_MAX} martadan ortiq parol almashtirib bo'lmaydi. Keyinroq urinib ko'ring."
+    if record and msg is None: hits.append(now)
+    if hits: _reset_hits[tg_id] = hits
+    else: _reset_hits.pop(tg_id, None)
+    _prune_fails(_reset_hits, 3600)
+    return msg
+
 async def cb_broadcast(c: CallbackQuery):
     if not _is_admin(c.from_user.id): return await c.answer()
     action, _, token = (c.data or "").partition(":")
@@ -1562,7 +1704,12 @@ async def admin_import(request):
     u_id, role = verify_token(request)
     if not u_id or role != "super_admin": return web.json_response({"status": "error", "message": "Ruxsat yo'q"}, status=403)
     if not _is_owner(await db.get_telegram_id(u_id) or 0): return web.json_response({"status": "error", "message": "Faqat bosh admin import qila oladi"}, status=403)
-    raw = await request.read()
+    raw, size = bytearray(), 0
+    async for chunk in request.content.iter_chunked(1 << 16):   # import katta bo'lishi mumkin: 100 MB gacha, lekin chegarali
+        size += len(chunk)
+        if size > IMPORT_MAX_BYTES: return web.json_response({"status": "error", "message": "Fayl juda katta (100 MB dan oshmasin)"}, status=413)
+        raw += chunk
+    raw = bytes(raw)
     try: rep = await run_import(raw)
     except ValueError as e: return web.json_response({"status": "error", "message": str(e)})
     except Exception as e:
@@ -1617,6 +1764,8 @@ async def daily_backup_loop():
     while True:
         try: await daily_backup_tick()
         except Exception as e: logger.error(f"Avto-zaxira tsikli xatosi: {e}")
+        try: await _prune_activity_tick()
+        except Exception as e: logger.error(f"Akkaunt tarixini tozalashda xato: {e}")
         await asyncio.sleep(600)   # har 10 daqiqada tekshiradi
 
 # --- FOYDALANUVCHI XABARINI ADMINGA YETKAZISH ---
@@ -1675,7 +1824,22 @@ async def remove_phone_keyboards():
     except Exception as e:
         logger.error(f"Tugmani tozalashda xato: {e}")
 
+IMPORT_MAX_BYTES = 100 * 1024 * 1024
+
+@web.middleware
+async def _json_errors_mw(request, handler):
+    """Noto'g'ri JSON / ortiqcha katta so'rov — 500 va traceback o'rniga toza 400/413."""
+    try:
+        return await handler(request)
+    except web.HTTPRequestEntityTooLarge:
+        return web.json_response({"status": "error", "message": "So'rov juda katta"}, status=413)
+    except json.JSONDecodeError:
+        return web.json_response({"status": "error", "message": "Noto'g'ri so'rov"}, status=400)
+
 async def handle_webhook(request):
+    # Telegram har so'rovga X-Telegram-Bot-Api-Secret-Token sarlavhasini qo'shadi (set_webhook(secret_token=...) bilan o'rnatilgan)
+    if not hmac.compare_digest(request.headers.get("X-Telegram-Bot-Api-Secret-Token", ""), WEBHOOK_HEADER_SECRET):
+        return web.Response(status=403)
     if bot:
         try: await dp.feed_update(bot, Update(**await request.json()))
         except Exception as e: logger.error(f"Webhook xatosi: {e}")   # Telegram qayta-qayta yubormasligi uchun doim 200 qaytaramiz
@@ -1698,27 +1862,28 @@ async def about(request):
     return web.Response(text=page, content_type="text/html", headers=_NO_CACHE)
 
 async def main():
-    app = web.Application(client_max_size=100 * 1024 * 1024, middlewares=[audit.make_middleware(verify_token)])   # /api/admin/import katta JSON qabul qilishi uchun
+    app = web.Application(client_max_size=2 * 1024 * 1024, middlewares=[_json_errors_mw, audit.make_middleware(verify_token)])   # oddiy so'rovlar 2 MB; /api/admin/import o'zi alohida o'qiydi
     app.router.add_get("/", index); app.router.add_get("/logo.jpg", logo); app.router.add_get("/about", about)
-    app.router.add_get("/health", lambda r: web.Response(text="OK"))
+    app.router.add_get("/health", lambda r: web.Response(text="OK") if db.pool else web.Response(text="starting", status=503))
     app.router.add_post("/api/auth/login", auth_login); app.router.add_get("/api/users", get_users_list)
     app.router.add_post("/api/users/add", add_user); app.router.add_post("/api/users/delete", delete_user)
     app.router.add_post("/api/users/edit", edit_user); app.router.add_post("/api/users/reload", reload_user_token); app.router.add_post("/api/users/primary", set_primary_user) 
     app.router.add_get("/api/stats", get_stats); app.router.add_post("/api/scan", do_scan)
     app.router.add_post("/api/feedback", submit_feedback)
     
-    app.router.add_post("/api/admin/set_shadow", admin_set_shadow); app.router.add_post("/api/admin/extend", admin_extend_trial)
+    app.router.add_post("/api/admin/extend", admin_extend_trial)
     app.router.add_post("/api/admin/backup", admin_backup); app.router.add_post("/api/admin/import", admin_import); app.router.add_post("/api/admin/sync_usernames", admin_sync_usernames); app.router.add_post("/api/admin/toggle_block", admin_toggle_block); app.router.add_get("/api/admin/all_data", get_admin_all_data)
     app.router.add_get("/api/admin/transcripts", admin_transcripts); app.router.add_get("/api/admin/transcript", admin_transcript_detail); app.router.add_post("/api/admin/transcript_refresh", admin_transcript_refresh); app.router.add_get("/api/admin/transcript_file", admin_transcript_file); app.router.add_post("/api/admin/transcript_send", admin_transcript_send)
     app.router.add_get("/api/admin/jokes", admin_jokes); app.router.add_post("/api/admin/jokes_import", admin_jokes_import); app.router.add_post("/api/admin/jokes_update", admin_jokes_update); app.router.add_post("/api/admin/jokes_delete", admin_jokes_delete); app.router.add_post("/api/admin/jokes_send", admin_jokes_send)
     extras.register(app, {"verify_token": verify_token, "verify_hero_account": verify_hero_account, "spawn_schedule": _spawn_schedule, "bot": bot})
     app.router.add_get("/api/admin/report", admin_report); app.router.add_post("/api/admin/report_send", admin_report_send)
+    app.router.add_get("/api/admin/acct_search", admin_acct_search); app.router.add_get("/api/admin/acct_detail", admin_acct_detail)
     app.router.add_get("/api/admin/companions", admin_companions); app.router.add_post("/api/admin/companions", admin_companions_save); app.router.add_get("/api/admin/lessons", admin_lessons); app.router.add_post("/api/admin/lessons_toggle", admin_lessons_toggle); app.router.add_get("/api/admin/schedules", admin_schedules); app.router.add_get("/api/admin/schedule", admin_schedule_detail); app.router.add_post("/api/admin/schedule_refresh", admin_schedule_refresh)
 
     app.router.add_post("/api/share/generate", share_generate); app.router.add_post("/api/share/import", share_import)
     app.router.add_get("/api/share/connections", share_connections)
     
-    if bot and BOT_TOKEN: app.router.add_post(f"/webhook/{BOT_TOKEN}", handle_webhook)
+    if bot and BOT_TOKEN and WEBHOOK_SECRET: app.router.add_post(f"/webhook/{WEBHOOK_SECRET}", handle_webhook)
 
     runner = web.AppRunner(app); await runner.setup()
     await web.TCPSite(runner, "0.0.0.0", PORT).start(); logger.info("✅ Veb-server ishga tushdi")
@@ -1733,6 +1898,12 @@ async def main():
     except Exception as e: logger.error(f"Adminlarni yuklashda xato: {e}")
     try: await refresh_blocked_users()
     except Exception as e: logger.error(f"Bloklanganlarni yuklashda xato: {e}")
+    try: await refresh_pw_changed()
+    except Exception as e: logger.error(f"Parol vaqtlarini yuklashda xato: {e}")
+    try: await db.cleanup_admin_shadows(ADMIN_ID)
+    except Exception as e: logger.error(f"Admin sharpa tozalashda xato: {e}")
+    try: await db.backfill_account_activity()
+    except Exception as e: logger.error(f"Akkaunt tarixini to'ldirishda xato: {e}")
     try:
         done, miss = await db.backfill_student_info()
         logger.info(f"🎓 Talabalar ro'yxati ({students.count()} qator): {done} ta akkauntga ism/ID yozildi, {miss} ta topilmadi")
@@ -1744,8 +1915,6 @@ async def main():
     _bg(remove_phone_keyboards())
 
     if bot and WEBAPP_URL:
-        try: await bot.set_webhook(f"{WEBAPP_URL}/webhook/{BOT_TOKEN}")
-        except Exception as e: logger.error(f"Webhook o'rnatilmadi: {e}")
         @dp.message(Command("start", "login"))
         async def l(m: Message):
             friends._st.pop(m.from_user.id, None)   # yarim qolgan suhbat qadamini tozalaymiz
@@ -1760,9 +1929,45 @@ async def main():
         @dp.message(Command("reset"))
         async def r(m: Message):
             friends._st.pop(m.from_user.id, None)
-            u, p = await db.reset_password(m.from_user.id)
-            if u: await m.answer(f"🔑 Yangi parol berildi.\n\n👤 Login: `{u}`\n🔑 Pass: `{p}`", parse_mode="Markdown")
-            else: await m.answer("Avval /start yuboring.")
+            tg = m.from_user.id
+            flags = await db.get_tg_user_flags(tg)
+            if not flags: return await m.answer("Avval /start yuboring.")
+            if flags["is_blocked"]: return await m.answer(BLOCKED_TEXT)
+            lim = _reset_limit_msg(tg)
+            if lim: return await m.answer(lim)
+            kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ Ha, yangi parol", callback_data="rst_yes"),
+                                                        InlineKeyboardButton(text="❌ Bekor", callback_data="rst_no")]])
+            sent = await m.answer("Yangi parol berilsinmi? Eski parol va boshqa qurilmalardagi sessiyalar ishlamay qoladi.", reply_markup=kb)
+            if len(_reset_pending) > 2000: _reset_pending.clear()   # chegara: xotira o'smasin
+            _reset_pending[tg] = (time.time(), sent.message_id)
+
+        @dp.callback_query(F.data.in_({"rst_yes", "rst_no"}))
+        async def r_confirm(c: CallbackQuery):
+            tg = c.from_user.id
+            pend = _reset_pending.get(tg)
+            # faqat so'rovni yuborgan foydalanuvchi, aynan shu xabardagi tugma
+            if not pend or not c.message or pend[1] != c.message.message_id:
+                return await c.answer("Bu so'rov eskirgan yoki sizniki emas.", show_alert=True)
+            _reset_pending.pop(tg, None)   # pop: ikki marta bosilsa ham bir marta ishlaydi
+            async def _edit(text):
+                try: await c.message.edit_text(text)
+                except Exception: pass
+            if c.data == "rst_no":
+                await _edit("❌ Bekor qilindi."); return await c.answer()
+            if time.time() - pend[0] > RESET_CONFIRM_TTL:
+                await _edit("⌛ Muddati o'tdi, /reset ni qayta yuboring."); return await c.answer()
+            flags = await db.get_tg_user_flags(tg)
+            if not flags: await _edit("Avval /start yuboring."); return await c.answer()
+            if flags["is_blocked"]: await _edit(BLOCKED_TEXT); return await c.answer()
+            lim = _reset_limit_msg(tg, record=True)
+            if lim: await _edit(lim); return await c.answer()
+            u, p = await db.reset_password(tg)
+            if not u: await _edit("Avval /start yuboring."); return await c.answer()
+            try: await refresh_pw_changed()   # eski JWT sessiyalar darhol yopiladi
+            except Exception as e: logger.error(f"Parol vaqtlarini yangilashda xato: {e}")
+            await _edit("✅ Tasdiqlandi.")
+            await c.answer()
+            await c.message.answer(f"🔑 Yangi parol berildi.\n\n👤 Login: `{u}`\n🔑 Pass: `{p}`\n\nEski parol endi ishlamaydi. Parolni saqlab qo'ying.", parse_mode="Markdown")
 
         # Admin: foydalanuvchilarga xabar yuborish (faqat ADMIN_ID ishlata oladi)
         dp.message.register(cmd_send, Command("send"))
@@ -1784,6 +1989,9 @@ async def main():
         if ADMIN_ID:  # "/" menyusida buyruqlar faqat adminlarga ko'rinadi
             await _set_menu(ADMIN_ID, OWNER_COMMANDS)
             for tid in ADMIN_TG_IDS - {ADMIN_ID}: await _set_menu(tid, ADMIN_COMMANDS)
+        # Webhook ENG OXIRIDA: handlerlar tayyor bo'lmasdan kelgan xabarlar yo'qolmasin
+        try: await bot.set_webhook(f"{WEBAPP_URL}/webhook/{WEBHOOK_SECRET}", secret_token=WEBHOOK_HEADER_SECRET, drop_pending_updates=False)
+        except Exception as e: logger.error(f"Webhook o'rnatilmadi: {e}")
     while True: await asyncio.sleep(3600)
 
 if __name__ == "__main__":

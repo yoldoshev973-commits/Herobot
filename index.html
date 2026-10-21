@@ -5,6 +5,37 @@
 <meta name="theme-color" content="#FDFAF5">
 <link rel="icon" href="/logo.jpg">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+/* Mavzu (light / dark). Tanlov saqlanadi; tanlanmagan bo'lsa Telegram yoki tizim mavzusiga ergashadi.
+   <head> ichida — sahifa yuklanayotganda oq miltillash bo'lmasligi uchun. */
+(function () {
+  var KEY = 'h_theme', root = document.documentElement;
+  var COLORS = { light: '#FDFAF5', dark: '#151515' };   // brauzer paneli / Telegram sarlavhasi rangi
+  var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  function saved() { try { var v = localStorage.getItem(KEY); return v === 'dark' || v === 'light' ? v : null; } catch (e) { return null; } }
+  function tgApp() { var t = window.Telegram && window.Telegram.WebApp; return t && t.initData ? t : null; }   // faqat Telegram ichida
+  function auto() { var t = tgApp(); if (t && t.colorScheme) return t.colorScheme === 'dark' ? 'dark' : 'light'; return mq && mq.matches ? 'dark' : 'light'; }
+  function current() { return saved() || auto(); }
+  function paint(t) {
+    root.setAttribute('data-theme', t);
+    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', COLORS[t]);
+    try { var a = window.Telegram && window.Telegram.WebApp; if (a && a.setHeaderColor) { a.setHeaderColor(COLORS[t]); a.setBackgroundColor(COLORS[t]); } } catch (e) {}
+    var b = document.querySelectorAll('.theme-tgl'); for (var i = 0; i < b.length; i++) b[i].setAttribute('aria-pressed', t === 'dark' ? 'true' : 'false');
+  }
+  function toggle() {
+    var next = current() === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem(KEY, next); } catch (e) {}
+    var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (document.startViewTransition && !calm) document.startViewTransition(function () { paint(next); }); else paint(next);
+  }
+  function follow() { if (!saved()) paint(auto()); }   // tizim/Telegram mavzusi o'zgarsa — faqat o'zi tanlamagan bo'lsa
+  if (mq) { if (mq.addEventListener) mq.addEventListener('change', follow); else if (mq.addListener) mq.addListener(follow); }
+  try { var a0 = window.Telegram && window.Telegram.WebApp; if (a0 && a0.onEvent) a0.onEvent('themeChanged', follow); } catch (e) {}
+  window.HeroTheme = { toggle: toggle, current: current, sync: function () { paint(current()); } };
+  paint(current());
+  document.addEventListener('DOMContentLoaded', function () { paint(current()); });
+})();
+</script>
 <title>HeroScan — Aqlli Akkaunt Boshqaruvi</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,700&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -21,6 +52,14 @@
     --ink-md:   #6B5744;
     --ink-lt:   #A8937D;
     --white:    #FFFFFF;
+    --deep:     #2A1F14;
+    --on-deep:  #FDFAF5;
+    --cream-rgb: 253,250,245; --sand-rgb: 242,235,224; --latte-rgb: 232,217,197; --brown-rgb: 181,137,90;
+    --shadow-rgb: 42,31,20; --on-deep-rgb: 253,250,245;
+    --hero-1: #F5EEE3; --hero-2: #EDE0CE; --hero-3: #F8F3EC;
+    --glass: rgba(255,255,255,.6); --glass-hi: rgba(255,255,255,.8); --glass-2: rgba(255,255,255,.52); --line: rgba(42,31,20,.18);
+    --ease-out: cubic-bezier(.23,1,.32,1);
+    color-scheme: light;
   }
 
   html { scroll-behavior: smooth; }
@@ -39,9 +78,9 @@
     position: fixed; top: 0; left: 0; right: 0; z-index: 200;
     padding: 18px 6vw;
     display: flex; align-items: center; justify-content: space-between;
-    background: rgba(253,250,245,.88);
+    background: rgba(var(--cream-rgb),.88);
     backdrop-filter: blur(20px);
-    border-bottom: 1px solid rgba(181,137,90,.15);
+    border-bottom: 1px solid rgba(var(--brown-rgb),.15);
     transition: background .3s;
   }
 
@@ -105,28 +144,28 @@
     position: absolute; inset: 0;
     background: linear-gradient(
       170deg,
-      rgba(253,250,245,.88) 0%,
-      rgba(242,235,224,.78) 45%,
-      rgba(232,217,197,.85) 75%,
-      rgba(253,250,245,.94) 100%
+      rgba(var(--cream-rgb),.88) 0%,
+      rgba(var(--sand-rgb),.78) 45%,
+      rgba(var(--latte-rgb),.85) 75%,
+      rgba(var(--cream-rgb),.94) 100%
     );
   }
   /* Gradient fallback if video doesn't load */
   .video-bg {
-    background: linear-gradient(135deg, #F5EEE3 0%, #EDE0CE 40%, #F8F3EC 100%);
+    background: linear-gradient(135deg, var(--hero-1) 0%, var(--hero-2) 40%, var(--hero-3) 100%);
   }
 
   .hero-content { position: relative; z-index: 1; }
 
   .hero-badge {
     display: inline-flex; align-items: center; gap: 8px;
-    background: rgba(181,137,90,.11);
-    border: 1px solid rgba(181,137,90,.28);
+    background: rgba(var(--brown-rgb),.11);
+    border: 1px solid rgba(var(--brown-rgb),.28);
     padding: 7px 18px; border-radius: 100px;
     font-size: .76rem; color: var(--brown-dk);
     letter-spacing: .09em; text-transform: uppercase;
     font-weight: 600; margin-bottom: 32px;
-    animation: fadeUp .6s ease both;
+    animation: fadeUp .6s var(--ease-out) both;
   }
 
   h1 {
@@ -135,7 +174,7 @@
     font-weight: 700; line-height: 1.07;
     letter-spacing: -.03em; max-width: 860px;
     color: var(--ink);
-    animation: fadeUp .7s .1s ease both;
+    animation: fadeUp .7s .1s var(--ease-out) both;
   }
   h1 em { color: var(--brown); font-style: italic; }
 
@@ -145,14 +184,14 @@
     color: var(--ink-md); max-width: 500px;
     margin-left: auto; margin-right: auto;
     line-height: 1.78; font-weight: 400;
-    animation: fadeUp .7s .2s ease both;
+    animation: fadeUp .7s .2s var(--ease-out) both;
   }
 
   .hero-actions {
     margin-top: 44px;
     display: flex; gap: 14px; flex-wrap: wrap;
     justify-content: center;
-    animation: fadeUp .7s .3s ease both;
+    animation: fadeUp .7s .3s var(--ease-out) both;
   }
 
   .btn-dark {
@@ -163,40 +202,40 @@
     text-decoration: none;
     transition: all .25s ease;
     display: inline-flex; align-items: center; gap: 8px;
-    box-shadow: 0 4px 20px rgba(42,31,20,.2);
+    box-shadow: 0 4px 20px rgba(var(--shadow-rgb),.2);
   }
   .btn-dark:hover { background: var(--brown-dk); transform: translateY(-2px); box-shadow: 0 8px 28px rgba(139,99,64,.32); }
 
   .btn-outline {
-    background: rgba(255,255,255,.6);
+    background: var(--glass);
     color: var(--ink-md);
     font-family: 'Plus Jakarta Sans', sans-serif;
     font-weight: 500; font-size: .93rem;
     padding: 13px 26px; border-radius: 100px;
-    border: 1.5px solid rgba(42,31,20,.18);
+    border: 1.5px solid var(--line);
     text-decoration: none;
     transition: all .25s ease;
     backdrop-filter: blur(8px);
   }
-  .btn-outline:hover { border-color: var(--brown); color: var(--brown-dk); background: rgba(255,255,255,.8); }
+  .btn-outline:hover { border-color: var(--brown); color: var(--brown-dk); background: var(--glass-hi); }
 
   /* Stat pills */
   .stats-row {
     margin-top: 64px;
     display: flex; justify-content: center; flex-wrap: wrap;
-    animation: fadeUp .7s .45s ease both;
-    background: rgba(255,255,255,.52);
+    animation: fadeUp .7s .45s var(--ease-out) both;
+    background: var(--glass-2);
     backdrop-filter: blur(14px);
-    border: 1px solid rgba(181,137,90,.18);
+    border: 1px solid rgba(var(--brown-rgb),.18);
     border-radius: 18px;
     max-width: 500px; margin-left: auto; margin-right: auto;
     overflow: hidden;
-    box-shadow: 0 2px 24px rgba(42,31,20,.06);
+    box-shadow: 0 2px 24px rgba(var(--shadow-rgb),.06);
   }
 
   .stat-item {
     flex: 1; padding: 20px 24px; text-align: center;
-    border-right: 1px solid rgba(181,137,90,.13);
+    border-right: 1px solid rgba(var(--brown-rgb),.13);
   }
   .stat-item:last-child { border-right: none; }
 
@@ -215,7 +254,7 @@
     font-size: .7rem; letter-spacing: .1em;
     text-transform: uppercase; color: var(--brown);
     font-weight: 600; margin-bottom: 14px;
-    background: rgba(181,137,90,.1);
+    background: rgba(var(--brown-rgb),.1);
     padding: 5px 14px; border-radius: 100px;
   }
 
@@ -249,17 +288,17 @@
   .step-num {
     font-family: 'Playfair Display', serif;
     font-size: 5.5rem; font-weight: 700;
-    color: rgba(181,137,90,.1);
+    color: rgba(var(--brown-rgb),.1);
     position: absolute; top: 16px; right: 20px;
     line-height: 1; pointer-events: none;
     transition: color .25s;
   }
-  .step:hover .step-num { color: rgba(181,137,90,.18); }
+  .step:hover .step-num { color: rgba(var(--brown-rgb),.18); }
 
   .step-icon {
     font-size: 1.6rem; margin-bottom: 24px;
     width: 54px; height: 54px;
-    background: rgba(181,137,90,.1);
+    background: rgba(var(--brown-rgb),.1);
     border-radius: 14px;
     display: flex; align-items: center; justify-content: center;
   }
@@ -290,7 +329,7 @@
   .review-card:hover {
     border-color: var(--brown);
     transform: translateY(-4px);
-    box-shadow: 0 12px 32px rgba(181,137,90,.11);
+    box-shadow: 0 12px 32px rgba(var(--brown-rgb),.11);
   }
 
   .stars { color: var(--brown); font-size: .88rem; letter-spacing: 2px; margin-bottom: 14px; }
@@ -318,23 +357,23 @@
 
   /* FINAL CTA */
   #cta {
-    background: var(--ink); text-align: center;
+    background: var(--deep); text-align: center;
     padding: 120px 6vw; position: relative; overflow: hidden;
   }
   #cta::before {
     content: '';
     position: absolute; width: 640px; height: 640px; border-radius: 50%;
-    background: radial-gradient(circle, rgba(181,137,90,.1) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(var(--brown-rgb),.1) 0%, transparent 70%);
     top: 50%; left: 50%; transform: translate(-50%,-50%);
     pointer-events: none;
   }
 
-  #cta .tag { background: rgba(181,137,90,.18); color: #D4A97A; }
-  #cta .sec-title { color: var(--cream); max-width: 600px; margin: 0 auto 20px; }
+  #cta .tag { background: rgba(var(--brown-rgb),.18); color: #D4A97A; }
+  #cta .sec-title { color: var(--on-deep); max-width: 600px; margin: 0 auto 20px; }
   #cta .sec-title em { color: #D4A97A; }
 
   #cta .sub {
-    color: rgba(253,250,245,.55); font-size: .97rem;
+    color: rgba(var(--on-deep-rgb),.55); font-size: .97rem;
     max-width: 440px; margin: 0 auto 44px;
     line-height: 1.72; position: relative;
   }
@@ -349,42 +388,42 @@
     text-decoration: none;
     transition: all .25s ease;
     display: inline-flex; align-items: center; gap: 8px;
-    box-shadow: 0 4px 24px rgba(181,137,90,.38);
+    box-shadow: 0 4px 24px rgba(var(--brown-rgb),.38);
   }
-  .btn-warm:hover { background: #C9956A; transform: translateY(-2px); box-shadow: 0 8px 32px rgba(181,137,90,.5); }
+  .btn-warm:hover { background: #C9956A; transform: translateY(-2px); box-shadow: 0 8px 32px rgba(var(--brown-rgb),.5); }
 
   .btn-ghost-lt {
-    background: transparent; color: rgba(253,250,245,.65);
-    border: 1.5px solid rgba(253,250,245,.18);
+    background: transparent; color: rgba(var(--on-deep-rgb),.65);
+    border: 1.5px solid rgba(var(--on-deep-rgb),.18);
     font-family: 'Plus Jakarta Sans', sans-serif;
     font-weight: 500; font-size: .93rem;
     padding: 13px 26px; border-radius: 100px;
     text-decoration: none; transition: all .25s;
   }
-  .btn-ghost-lt:hover { color: var(--cream); border-color: rgba(253,250,245,.45); }
+  .btn-ghost-lt:hover { color: var(--on-deep); border-color: rgba(var(--on-deep-rgb),.45); }
 
-  .fine { margin-top: 20px; color: rgba(253,250,245,.3); font-size: .78rem; position: relative; }
+  .fine { margin-top: 20px; color: rgba(var(--on-deep-rgb),.3); font-size: .78rem; position: relative; }
 
   /* FOOTER */
   footer {
-    background: var(--ink);
-    border-top: 1px solid rgba(253,250,245,.07);
+    background: var(--deep);
+    border-top: 1px solid rgba(var(--on-deep-rgb),.07);
     padding: 34px 6vw;
     display: flex; align-items: center; justify-content: space-between;
     flex-wrap: wrap; gap: 16px;
   }
-  .foot-logo { font-family: 'Playfair Display', serif; font-weight: 700; font-size: 1.1rem; color: var(--cream); text-decoration: none; }
+  .foot-logo { font-family: 'Playfair Display', serif; font-weight: 700; font-size: 1.1rem; color: var(--on-deep); text-decoration: none; }
   .foot-links { display: flex; gap: 24px; }
-  .foot-links a { color: rgba(253,250,245,.38); text-decoration: none; font-size: .8rem; transition: color .2s; }
-  .foot-links a:hover { color: var(--cream); }
-  .foot-copy { color: rgba(253,250,245,.22); font-size: .76rem; }
+  .foot-links a { color: rgba(var(--on-deep-rgb),.38); text-decoration: none; font-size: .8rem; transition: color .2s; }
+  .foot-links a:hover { color: var(--on-deep); }
+  .foot-copy { color: rgba(var(--on-deep-rgb),.22); font-size: .76rem; }
 
   /* ANIMATIONS */
   @keyframes fadeUp {
     from { opacity: 0; transform: translateY(24px); }
     to   { opacity: 1; transform: translateY(0); }
   }
-  .reveal { opacity: 0; transform: translateY(30px); transition: opacity .65s ease, transform .65s ease; }
+  .reveal { opacity: 0; transform: translateY(30px); transition: opacity .6s var(--ease-out), transform .6s var(--ease-out); }
   .reveal.on { opacity: 1; transform: none; }
 
   /* MOBILE */
@@ -392,7 +431,7 @@
     .steps { grid-template-columns: 1fr; gap: 1px; }
     .step { padding: 34px 26px; }
     .how-top { flex-direction: column; }
-    .nav-links li:not(:last-child) { display: none; }
+    .nav-links li:not(:last-child):not(.nav-tgl) { display: none; }
     footer { flex-direction: column; text-align: center; }
     .foot-links { justify-content: center; }
     .stats-row { max-width: 100%; }
@@ -400,6 +439,56 @@
     .btn-dark, .btn-outline { text-align: center; justify-content: center; }
     .trust-strip { gap: 20px; }
     #cta { padding: 80px 6vw; }
+  }
+
+  /* ===== Dark mode + harakat =====
+     Ranglar: Claude ilovasining dark mavzusi (fon/sirt skrinshotdan o'lchangan) + Anthropic brend ranglari (#faf9f5, #b0aea5, #d97757).
+     Harakat: Emil Kowalski (animations.dev) ease-out egri chizig'i. */
+  nav.scrolled { background: rgba(var(--cream-rgb), .97); }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --cream: #151515;
+    --sand: #2a2a28;
+    --latte: #383835;
+    --white: #20201e;      /* karta */
+    --ink: #faf9f5;
+    --ink-md: #b0aea5;
+    --ink-lt: #8b8a85;
+    --brown: #d97757;
+    --brown-dk: #e08c70;
+    --accent-solid: #c6613f;
+    --deep: #20201e;       /* CTA va footer */
+    --on-deep: #faf9f5;
+    --on-deep-rgb: 250,249,245;
+    --cream-rgb: 21,21,21; --sand-rgb: 26,26,25; --latte-rgb: 32,32,30; --brown-rgb: 217,119,87; --shadow-rgb: 0,0,0;
+    --hero-1: #1a1a19; --hero-2: #20201e; --hero-3: #181817;
+    --glass: rgba(250,249,245,.05); --glass-hi: rgba(250,249,245,.09); --glass-2: rgba(250,249,245,.04); --line: rgba(250,249,245,.16);
+  }
+  :root[data-theme="dark"] .video-bg video { filter: saturate(.5) brightness(.5); }
+  :root[data-theme="dark"] #how { background: var(--cream); }
+  :root[data-theme="dark"] .step { background: var(--white); }
+  :root[data-theme="dark"] .step:hover { background: var(--sand); }
+  :root[data-theme="dark"] .btn-dark, :root[data-theme="dark"] .btn-warm, :root[data-theme="dark"] .nav-cta { background: var(--accent-solid) !important; color: #fff !important; box-shadow: none; }
+  :root[data-theme="dark"] .btn-dark:hover, :root[data-theme="dark"] .btn-warm:hover, :root[data-theme="dark"] .nav-cta:hover { background: var(--brown) !important; box-shadow: none; }
+  :root[data-theme="dark"] ::selection { background: rgba(217,119,87,.35); }
+
+  .nav-tgl { display: flex; }
+  .nav-tgl .theme-tgl { width: 32px; height: 32px; }   /* navbar balandligini o'zgartirmaydi */
+  .theme-tgl { position: relative; display: inline-grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 12px; border: 1px solid var(--latte); background: transparent; color: var(--ink-md); cursor: pointer; transition: transform 160ms var(--ease-out), background-color .2s, color .2s; -webkit-tap-highlight-color: transparent; }
+  .theme-tgl:active { transform: scale(.94); }
+  .theme-tgl:focus-visible { outline: 2px solid var(--brown); outline-offset: 2px; }
+  .theme-tgl svg { grid-area: 1 / 1; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform 250ms var(--ease-out), opacity 200ms ease; }
+  .theme-tgl .i-moon { opacity: 0; transform: rotate(-60deg) scale(.6); }
+  :root[data-theme="dark"] .theme-tgl .i-sun { opacity: 0; transform: rotate(60deg) scale(.6); }
+  :root[data-theme="dark"] .theme-tgl .i-moon { opacity: 1; transform: none; }
+  @media (hover: hover) and (pointer: fine) { .theme-tgl:hover { background: var(--sand); color: var(--ink); } }
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: .22s; animation-timing-function: ease; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .reveal { opacity: 1; transform: none; transition: none; }
+    .hero-badge, h1, .hero-sub, .hero-actions, .stats-row { animation: none; }
+    .theme-tgl svg { transition: opacity .15s; transform: none !important; }
+    ::view-transition-old(root), ::view-transition-new(root) { animation-duration: .01s; }
   }
 </style>
 </head>
@@ -414,6 +503,7 @@
   <ul class="nav-links">
     <li><a href="#how">Qanday ishlaydi</a></li>
     <li><a href="#proof">Fikrlar</a></li>
+    <li class="nav-tgl"><button class="theme-tgl" type="button" onclick="HeroTheme.toggle()" aria-label="Mavzu / Theme" title="Light / Dark" aria-pressed="false"><svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg><svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></button></li>
     <li><a href="https://t.me/your_bot" class="nav-cta" target="_blank">Botni ochish</a></li>
   </ul>
 </nav>
@@ -590,16 +680,14 @@
   // Nav on scroll
   const nav = document.querySelector('nav');
   window.addEventListener('scroll', () => {
-    nav.style.background = window.scrollY > 40
-      ? 'rgba(253,250,245,.97)'
-      : 'rgba(253,250,245,.88)';
+    nav.classList.toggle('scrolled', window.scrollY > 40);
   }, { passive: true });
 
   // Smooth scroll
   document.querySelectorAll('a[href^="#"]').forEach(a => {
     a.addEventListener('click', e => {
       const t = document.querySelector(a.getAttribute('href'));
-      if (t) { e.preventDefault(); t.scrollIntoView({ behavior: 'smooth' }); }
+      if (t) { e.preventDefault(); t.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); }
     });
   });
 </script>

@@ -1,13 +1,12 @@
 import asyncpg
 import os
-import random
 import secrets
 import hmac
 import string
 import json
 import logging
 import bcrypt
-from datetime import datetime, timedelta
+from datetime import datetime
 import students
 from cryptography.fernet import Fernet
 
@@ -97,10 +96,12 @@ async def init_db():
                 ALTER TABLE app_users ADD COLUMN IF NOT EXISTS full_name VARCHAR(128);
                 ALTER TABLE app_users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE;
                 ALTER TABLE app_users ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE;
+                ALTER TABLE app_users ADD COLUMN IF NOT EXISTS pw_changed_at TIMESTAMP;
                 ALTER TABLE scan_logs ADD COLUMN IF NOT EXISTS total_count INTEGER DEFAULT 0;
                 ALTER TABLE scan_logs ADD COLUMN IF NOT EXISTS duration FLOAT DEFAULT 0.0;
                 ALTER TABLE scan_logs ADD COLUMN IF NOT EXISTS details JSONB;
                 ALTER TABLE scan_logs ADD COLUMN IF NOT EXISTS lesson VARCHAR(160);
+                ALTER TABLE scan_logs ADD COLUMN IF NOT EXISTS qr_url TEXT;
                 ALTER TABLE hero_accounts DROP COLUMN IF EXISTS proxy_url;
                 ALTER TABLE hero_accounts ADD COLUMN IF NOT EXISTS student_id VARCHAR(64);
                 ALTER TABLE hero_accounts ADD COLUMN IF NOT EXISTS full_name VARCHAR(300);
@@ -115,11 +116,36 @@ async def init_db():
                 CREATE INDEX IF NOT EXISTS hero_accounts_email_idx ON hero_accounts (email);
                 ALTER TABLE hero_accounts ADD COLUMN IF NOT EXISTS is_primary BOOLEAN NOT NULL DEFAULT FALSE;
                 CREATE UNIQUE INDEX IF NOT EXISTS hero_accounts_primary_uniq ON hero_accounts (user_id) WHERE is_primary;
+                CREATE TABLE IF NOT EXISTS account_activity (
+                    id BIGSERIAL PRIMARY KEY, email TEXT NOT NULL, owner_user_id INTEGER, scan_log_id INTEGER,
+                    lesson TEXT, kind TEXT, ok BOOLEAN NOT NULL, reason TEXT, msg TEXT, scanned_at TIMESTAMP DEFAULT NOW()
+                );
+                CREATE INDEX IF NOT EXISTS account_activity_email_idx ON account_activity (email, scanned_at DESC);
+                CREATE INDEX IF NOT EXISTS account_activity_time_idx ON account_activity (scanned_at);
             """)
         logger.info("✅ Database tayyor.")
     except Exception as e:
         logger.error(f"❌ Baza xatosi: {e}")
         raise   # baza bo'lmasa bot ishlay olmaydi: aniq xato bilan to'xtaymiz
+
+async def cleanup_admin_shadows(admin_tg_id):
+    """Bir martalik tozalash (idempotent): eski admin "sharpa" yozuvlarini olib tashlaydi.
+    Admin foydalanuvchilarning shadow_targets ro'yxatida FAQAT share_codes orqali haqiqiy ulashilganlar qoladi.
+    Oddiy foydalanuvchilarga tegmaydi. O'zgargan (olib tashlangan) elementlar sonini qaytaradi."""
+    removed = 0
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            admins = await conn.fetch("SELECT id, shadow_targets FROM app_users WHERE is_admin = TRUE OR telegram_id = $1", int(admin_tg_id or 0))
+            for a in admins:
+                curr = _jsonish(a["shadow_targets"]) or []
+                if not isinstance(curr, list) or not curr: continue
+                real = {r["used_by"] for r in await conn.fetch("SELECT used_by FROM share_codes WHERE from_user_id = $1 AND used = TRUE AND used_by IS NOT NULL", a["id"])}
+                keep = [t for t in curr if t in real]
+                if len(keep) != len(curr):
+                    await conn.execute("UPDATE app_users SET shadow_targets = $1::jsonb WHERE id = $2", json.dumps(keep), a["id"])
+                    removed += len(curr) - len(keep)
+    logger.info(f"🧹 Admin sharpa tozalash: {removed} ta yozuv olib tashlandi")
+    return removed
 
 async def get_or_create_user(telegram_id, username=None, full_name=None):
     """Returns (login, plaintext_password_or_None, trial_ends_at).
@@ -198,12 +224,26 @@ async def get_user_contact(user_id):
     return dict(row) if row else None
 
 async def reset_password(telegram_id):
-    """Generates a new plaintext password, stores its bcrypt hash, and returns (login, plaintext_password)."""
+    """Generates a new plaintext password, stores its bcrypt hash, and returns (login, plaintext_password).
+    pw_changed_at ga hozirgi (naive UTC) vaqt yoziladi — eski JWT sessiyalar shu vaqtdan keyin ishlamaydi.
+    Bloklangan foydalanuvchiga parol berilmaydi (None, None)."""
     password = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(10))
     pass_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     async with pool.acquire() as conn:
-        row = await conn.fetchrow("UPDATE app_users SET password=$1 WHERE telegram_id=$2 RETURNING login", pass_hash, telegram_id)
+        row = await conn.fetchrow("UPDATE app_users SET password=$1, pw_changed_at = NOW() AT TIME ZONE 'UTC' WHERE telegram_id=$2 AND NOT COALESCE(is_blocked, FALSE) RETURNING login", pass_hash, telegram_id)
     return (row['login'], password) if row else (None, None)
+
+async def get_tg_user_flags(telegram_id):
+    """Telegram ID bo'yicha (id, is_blocked) — /reset tasdiqidan oldin tekshirish uchun. Yo'q bo'lsa None."""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT id, COALESCE(is_blocked, FALSE) AS is_blocked FROM app_users WHERE telegram_id=$1", int(telegram_id))
+    return dict(row) if row else None
+
+async def get_pw_changed():
+    """{app_users.id: pw_changed_at (naive UTC datetime)} — parol almashtirilgan foydalanuvchilar."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("SELECT id, pw_changed_at FROM app_users WHERE pw_changed_at IS NOT NULL")
+    return {r["id"]: r["pw_changed_at"] for r in rows}
 
 async def verify_login(login, password, admin_id):
     if not login or not password: return None, "Bo'sh maydon"
@@ -225,9 +265,17 @@ async def get_telegram_id(user_id):
     async with pool.acquire() as conn:
         return await conn.fetchval("SELECT telegram_id FROM app_users WHERE id=$1", int(user_id))
 
-async def extend_user_trial(target_id):
+async def extend_user_trial(target_id, days=30):
+    """Obunani `days` kunga uzaytiradi (1..365). Cheksiz (NULL) muddatga TEGMAYDI.
+    Qaytaradi: {"found": bool, "unlimited": bool, "trial_ends_at": datetime|None} (naive UTC)."""
+    days = max(1, min(365, int(days)))
     async with pool.acquire() as conn:
-        await conn.execute("UPDATE app_users SET trial_ends_at = GREATEST(trial_ends_at, NOW()) + INTERVAL '30 days' WHERE id=$1", int(target_id))
+        new_end = await conn.fetchval(
+            "UPDATE app_users SET trial_ends_at = GREATEST(trial_ends_at, NOW() AT TIME ZONE 'UTC') + $2 * INTERVAL '1 day' "
+            "WHERE id=$1 AND trial_ends_at IS NOT NULL RETURNING trial_ends_at", int(target_id), days)
+        if new_end is not None: return {"found": True, "unlimited": False, "trial_ends_at": new_end}
+        exists = await conn.fetchval("SELECT 1 FROM app_users WHERE id=$1", int(target_id))
+    return {"found": bool(exists), "unlimited": bool(exists), "trial_ends_at": None}
 
 async def add_hero_account(user_id, email, password, token="NO_TOKEN"):
     email = (email or "").strip().lower()
@@ -304,9 +352,129 @@ async def get_user_stats(user_id):
         last = await conn.fetchrow("SELECT success_count, total_count FROM scan_logs WHERE user_id=$1 ORDER BY scanned_at DESC LIMIT 1", int(user_id))
         return {"total_accounts": total or 0, "last_success": last['success_count'] if last else 0, "last_total": last['total_count'] if last else 0}
 
-async def save_detailed_scan(user_id, success, total, duration, details, lesson=None):
+def _split_lesson_kind(lesson):
+    """Dars yozuvidagi " · avto" / " · hamroh" qo'shimchasidan (tozalangan nom, kind) ni ajratadi. Qo'shimcha yo'q bo'lsa kind='manual'."""
+    s = str(lesson).strip() if lesson else ""
+    for suffix, kind in ((" · avto", "avto"), (" · hamroh", "hamroh")):
+        if s.endswith(suffix): return (s[:-len(suffix)].strip() or None), kind
+    return (s or None), "manual"
+
+def _activity_rows(details, user_id, scan_log_id, lesson, kind):
+    """scan_logs.details ro'yxatidan account_activity qatorlari (email'siz elementlar o'tkazib yuboriladi)."""
+    rows = []
+    for it in (details if isinstance(details, list) else []):
+        if not isinstance(it, dict): continue
+        email = str(it.get("email") or "").strip().lower()
+        if not email: continue
+        reason, msg = it.get("reason"), it.get("msg")
+        rows.append((email, int(user_id), scan_log_id, (lesson or None) and str(lesson)[:160], kind, bool(it.get("ok")),
+                     str(reason)[:40] if reason else None, str(msg)[:300] if msg else None))
+    return rows
+
+async def save_detailed_scan(user_id, success, total, duration, details, lesson=None, qr_url=None):
     async with pool.acquire() as conn:
-        await conn.execute("INSERT INTO scan_logs (user_id, success_count, total_count, duration, details, lesson) VALUES ($1, $2, $3, $4, $5, $6)", int(user_id), success, total, duration, json.dumps(details), lesson)
+        log_id = await conn.fetchval("INSERT INTO scan_logs (user_id, success_count, total_count, duration, details, lesson, qr_url) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id", int(user_id), success, total, duration, json.dumps(details), lesson, (str(qr_url)[:2000] if qr_url else None))
+        try:   # akkaunt tarixi — xato bersa skaner/log buzilmasin
+            clean, kind = _split_lesson_kind(lesson)
+            rows = _activity_rows(details, user_id, log_id, clean, kind)
+            if rows: await conn.executemany("INSERT INTO account_activity (email, owner_user_id, scan_log_id, lesson, kind, ok, reason, msg) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)", rows)
+        except Exception as e: logger.warning(f"Akkaunt tarixi yozilmadi: {e}")
+
+async def backfill_account_activity():
+    """Bir martalik to'ldirish: account_activity bo'sh bo'lsa, scan_logs.details dan (so'nggi 180 kun) to'ldiradi. Idempotent. Qo'shilgan qatorlar soni."""
+    async with pool.acquire() as conn:
+        if await conn.fetchval("SELECT EXISTS (SELECT 1 FROM account_activity)"): return 0
+        try:
+            res = await conn.execute("""
+                INSERT INTO account_activity (email, owner_user_id, scan_log_id, lesson, kind, ok, reason, msg, scanned_at)
+                SELECT lower(trim(e->>'email')), s.user_id, s.id,
+                       NULLIF(regexp_replace(COALESCE(s.lesson, ''), ' · (avto|hamroh)$', ''), ''),
+                       CASE WHEN s.lesson LIKE '% · avto' THEN 'avto' WHEN s.lesson LIKE '% · hamroh' THEN 'hamroh' ELSE 'manual' END,
+                       COALESCE(e->>'ok', 'false') = 'true', left(e->>'reason', 40), left(e->>'msg', 300), s.scanned_at
+                FROM scan_logs s
+                CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(s.details::jsonb) = 'array' THEN s.details::jsonb ELSE '[]'::jsonb END) e
+                WHERE s.scanned_at > NOW() AT TIME ZONE 'UTC' - INTERVAL '180 days'
+                  AND jsonb_typeof(e) = 'object' AND COALESCE(trim(e->>'email'), '') <> ''""")
+            n = int(res.split()[-1])
+        except Exception as ex:
+            logger.warning(f"Akkaunt tarixini to'ldirishda xato: {ex}"); return 0
+    logger.info(f"📒 Akkaunt tarixi to'ldirildi: {n} ta yozuv")
+    return n
+
+async def prune_account_activity(days=365):
+    """Eski akkaunt tarixi yozuvlarini o'chiradi (saqlash muddati: 365 kun). O'chirilganlar soni."""
+    async with pool.acquire() as conn:
+        res = await conn.execute("DELETE FROM account_activity WHERE scanned_at < (NOW() AT TIME ZONE 'UTC') - $1 * INTERVAL '1 day'", int(days))
+    return int(res.split()[-1])
+
+def _esc_like(q):
+    return q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+async def search_accounts(q, limit=40):
+    """Admin: akkaunt qidirish (ism / student ID / email). Bo'sh q — oxirgi 30 kun ichida faol 40 akkaunt.
+    Har qator: email, full_name, student_id, owner, token_ok, last_in, ok_count, fail_count. Parol/token QAYTMAYDI."""
+    q = (q or "").strip()[:100]
+    async with pool.acquire() as conn:
+        order = None
+        if not q:
+            order = [r["email"] for r in await conn.fetch(
+                "SELECT email FROM account_activity WHERE scanned_at > (NOW() AT TIME ZONE 'UTC') - INTERVAL '30 days' "
+                "GROUP BY email ORDER BY MAX(scanned_at) DESC LIMIT $1", limit)]
+            rows = await conn.fetch(_ACC_BASE_SQL + "WHERE lower(a.email) = ANY($1::text[]) GROUP BY lower(a.email)", order) if order else []
+        else:
+            pat = f"%{_esc_like(q)}%"
+            rows = list(await conn.fetch(_ACC_BASE_SQL + "WHERE a.email ILIKE $1 OR a.full_name ILIKE $1 OR a.student_id ILIKE $1 "
+                                         "GROUP BY lower(a.email) ORDER BY MAX(a.full_name) NULLS LAST, lower(a.email) LIMIT $2", pat, limit))
+            if len(rows) < limit:   # bazada ism/ID yozilmagan akkauntlar — talabalar ro'yxatidan qidiramiz
+                have, ql = {r["email"] for r in rows}, q.lower()
+                for r in await conn.fetch(_ACC_BASE_SQL + "WHERE a.full_name IS NULL OR a.student_id IS NULL GROUP BY lower(a.email) LIMIT 3000"):
+                    if r["email"] in have: continue
+                    st = students.lookup(r["email"]) or {}
+                    if ql in (st.get("full_name") or "").lower() or ql in (st.get("student_id") or "").lower():
+                        rows.append(r); have.add(r["email"])
+                        if len(rows) >= limit: break
+        emails = [r["email"] for r in rows]
+        stats = {r["email"]: r for r in await conn.fetch(
+            "SELECT email, MAX(scanned_at) FILTER (WHERE ok) AS last_in, COUNT(*) FILTER (WHERE ok) AS ok_count, COUNT(*) FILTER (WHERE NOT ok) AS fail_count "
+            "FROM account_activity WHERE email = ANY($1::text[]) GROUP BY email", emails)} if emails else {}
+    out = []
+    for r in rows:
+        st = students.lookup(r["email"]) or {}
+        s = stats.get(r["email"])
+        out.append(parse_db_row({"email": r["email"], "full_name": r["full_name"] or st.get("full_name"), "student_id": r["student_id"] or st.get("student_id"),
+                                 "owner": ", ".join(r["owners"][:2]) + (f" +{len(r['owners']) - 2}" if len(r["owners"]) > 2 else ""),
+                                 "token_ok": bool(r["token_ok"]), "last_in": s["last_in"] if s else None,
+                                 "ok_count": s["ok_count"] if s else 0, "fail_count": s["fail_count"] if s else 0}))
+    if order is not None: out.sort(key=lambda x: order.index(x["email"]))
+    return out
+
+async def get_account_detail(email):
+    """Admin: bitta akkaunt bo'yicha profil + hisob + darslar + yo'l turlari + so'nggi 200 yozuv. Parol/token QAYTMAYDI. Topilmasa None."""
+    email = (email or "").strip().lower()
+    async with pool.acquire() as conn:
+        acc = await conn.fetchrow(_ACC_BASE_SQL + "WHERE lower(a.email) = $1 GROUP BY lower(a.email)", email)
+        summ = await conn.fetchrow(
+            "SELECT COUNT(*) FILTER (WHERE ok) AS ok_count, COUNT(*) FILTER (WHERE NOT ok) AS fail_count, COUNT(DISTINCT lesson) AS lessons, "
+            "MIN(scanned_at) FILTER (WHERE ok) AS first_in, MAX(scanned_at) FILTER (WHERE ok) AS last_in FROM account_activity WHERE email = $1", email)
+        by_lesson = await conn.fetch(
+            "SELECT lesson, COUNT(*) FILTER (WHERE ok) AS ok, COUNT(*) FILTER (WHERE NOT ok) AS fail, MAX(scanned_at) AS last_at "
+            "FROM account_activity WHERE email = $1 GROUP BY lesson ORDER BY COUNT(*) FILTER (WHERE ok) DESC, MAX(scanned_at) DESC LIMIT 100", email)
+        by_kind = await conn.fetch("SELECT kind, COUNT(*) AS n FROM account_activity WHERE email = $1 AND ok GROUP BY kind", email)
+        timeline = await conn.fetch(
+            "SELECT scanned_at, lesson, kind, ok, reason FROM account_activity WHERE email = $1 ORDER BY scanned_at DESC, id DESC LIMIT 200", email)
+        sched = await conn.fetchrow("SELECT fetched_at FROM hero_schedules WHERE email = $1", email)
+    if not acc and not summ["ok_count"] and not summ["fail_count"]: return None
+    st = students.lookup(email) or {}
+    kinds = {"manual": 0, "avto": 0, "hamroh": 0}
+    for r in by_kind: kinds[r["kind"] if r["kind"] in kinds else "manual"] += r["n"]
+    return {
+        "profile": parse_db_row({"email": email, "full_name": (acc and acc["full_name"]) or st.get("full_name"), "student_id": (acc and acc["student_id"]) or st.get("student_id"),
+                                 "owners": list(acc["owners"]) if acc else [], "token_ok": bool(acc and acc["token_ok"]), "schedule_at": sched["fetched_at"] if sched else None}),
+        "summary": parse_db_row({"ok_count": summ["ok_count"], "fail_count": summ["fail_count"], "lessons": summ["lessons"], "first_in": summ["first_in"], "last_in": summ["last_in"]}),
+        "by_lesson": [parse_db_row({"lesson": r["lesson"], "ok": r["ok"], "fail": r["fail"], "last_at": r["last_at"]}) for r in by_lesson],
+        "by_kind": kinds,
+        "timeline": [parse_db_row(dict(r)) for r in timeline],
+    }
 
 async def get_hero_accounts(user_id):
     async with pool.acquire() as conn:
@@ -453,17 +621,6 @@ async def get_shadow_admins(target_user_id):
     async with pool.acquire() as conn:
         return await conn.fetch("SELECT id FROM app_users WHERE shadow_targets @> $1::jsonb", json.dumps([int(target_user_id)]))
 
-async def set_shadow_target(admin_id, target_id):
-    async with pool.acquire() as conn:
-        curr = await conn.fetchval("SELECT shadow_targets FROM app_users WHERE id=$1", int(admin_id))
-        if not curr: targets = []
-        elif isinstance(curr, str): targets = json.loads(curr)
-        else: targets = list(curr)
-        tid = int(target_id)
-        if tid in targets: targets.remove(tid)
-        else: targets.append(tid)
-        await conn.execute("UPDATE app_users SET shadow_targets=$1::jsonb WHERE id=$2", json.dumps(targets), int(admin_id))
-
 def parse_db_row(row):
     if not row: return {}
     d = dict(row)
@@ -475,6 +632,11 @@ def parse_db_row(row):
 # Ikkalasi ham bo'lmasa — Telegram ismi, u ham bo'lmasa login'ga qaytadi.
 _DISPLAY_SQL = "CASE WHEN u.username IS NOT NULL AND u.username <> '' THEN '@' || u.username WHEN u.phone_number IS NOT NULL AND u.phone_number <> '' THEN u.phone_number WHEN u.full_name IS NOT NULL AND u.full_name <> '' THEN u.full_name ELSE u.login END"
 
+_TOKEN_OK_SQL = "COALESCE(bool_or(a.bearer_token IS NOT NULL AND a.bearer_token <> 'NO_TOKEN' AND a.bearer_token NOT LIKE 'ERROR%'), FALSE)"
+_ACC_BASE_SQL = (f"SELECT lower(a.email) AS email, MAX(a.full_name) AS full_name, MAX(a.student_id) AS student_id, "
+                 f"array_agg(DISTINCT {_DISPLAY_SQL}) AS owners, {_TOKEN_OK_SQL} AS token_ok "
+                 "FROM hero_accounts a JOIN app_users u ON u.id = a.user_id ")
+
 async def get_super_admin_data(admin_id):
     async with pool.acquire() as conn:
         total_users = await conn.fetchval("SELECT COUNT(*) FROM app_users") or 0
@@ -483,21 +645,17 @@ async def get_super_admin_data(admin_id):
         # 'Bugun' — Toshkent kuni bo'yicha (UTC+5); baza vaqti UTC
         today_scans = await conn.fetchval("SELECT COUNT(*) FROM scan_logs WHERE (scanned_at + INTERVAL '5 hours')::date = (NOW() AT TIME ZONE 'UTC' + INTERVAL '5 hours')::date") or 0
         
-        try: 
-            raw_shadows = await conn.fetchval("SELECT shadow_targets FROM app_users WHERE id=$1", int(admin_id))
-            my_shadows = json.loads(raw_shadows) if isinstance(raw_shadows, str) else (list(raw_shadows) if raw_shadows else [])
-        except: my_shadows = []
+        # username — Telegram @username (bo'sh bo'lishi mumkin); primary_email — foydalanuvchi ASOSIY qilib belgilagan akkaunt emaili (belgilamagan bo'lsa NULL)
+        users_data = await conn.fetch(f"SELECT u.id, {_DISPLAY_SQL} as login, u.username, u.telegram_id, u.trial_ends_at, u.created_at, u.is_blocked, COUNT(a.id) as hero_count, (SELECT p.email FROM hero_accounts p WHERE p.user_id = u.id AND p.is_primary LIMIT 1) AS primary_email FROM app_users u LEFT JOIN hero_accounts a ON u.id = a.user_id GROUP BY u.id ORDER BY u.created_at DESC")
 
-        users_data = await conn.fetch(f"SELECT u.id, {_DISPLAY_SQL} as login, u.telegram_id, u.trial_ends_at, u.created_at, u.is_blocked, COUNT(a.id) as hero_count FROM app_users u LEFT JOIN hero_accounts a ON u.id = a.user_id GROUP BY u.id ORDER BY u.created_at DESC")
-        
-        accounts_data = await conn.fetch(f"SELECT a.user_id, {_DISPLAY_SQL} as tg_login, a.email, a.hero_password, a.full_name, a.student_id FROM hero_accounts a JOIN app_users u ON a.user_id = u.id ORDER BY a.id DESC")
+        accounts_data = await conn.fetch(f"SELECT a.user_id, {_DISPLAY_SQL} as tg_login, a.email, a.hero_password, a.full_name, a.student_id, a.is_primary FROM hero_accounts a JOIN app_users u ON a.user_id = u.id ORDER BY a.id DESC")
         accs = []
         for a in accounts_data:
             d = parse_db_row(a)
             d['hero_password'] = decrypt_pass(d['hero_password'])
             accs.append(d)
 
-        logs_data = await conn.fetch(f"SELECT {_DISPLAY_SQL} as login, l.success_count, l.total_count, l.duration, l.lesson, l.scanned_at, l.details FROM scan_logs l JOIN app_users u ON l.user_id = u.id ORDER BY l.scanned_at DESC LIMIT 50")
+        logs_data = await conn.fetch(f"SELECT {_DISPLAY_SQL} as login, l.success_count, l.total_count, l.duration, l.lesson, l.scanned_at, l.details, l.qr_url FROM scan_logs l JOIN app_users u ON l.user_id = u.id ORDER BY l.scanned_at DESC LIMIT 50")
         
         archived_data = await conn.fetch(f"SELECT {_DISPLAY_SQL} as tg_login, a.email, a.hero_password, a.full_name, a.student_id, a.deleted_at FROM archived_accounts a JOIN app_users u ON a.user_id = u.id ORDER BY a.id DESC")
         archs = []
@@ -508,7 +666,6 @@ async def get_super_admin_data(admin_id):
 
         return {
             "stats": {"total_users": total_users, "total_heroes": total_heroes, "today_scans": today_scans},
-            "my_shadows": my_shadows,
             "users": [parse_db_row(u) for u in users_data], 
             "accounts": accs, 
             "logs": [dict(parse_db_row(l), details=_enrich_details(_jsonish(l["details"]))) for l in logs_data],

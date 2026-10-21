@@ -10,7 +10,6 @@ import audit
 import database as db
 import friends
 import i18n
-import jokes
 import notify
 import stats
 
