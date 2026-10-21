@@ -186,12 +186,20 @@ def _find_lesson_in(obj, depth=0):
             if found: return found
     return None
 
+_qr_sample = {}    # qr_url -> Hero javobining boshi (QR tuzilishini tahlil qilish uchun admin "QR kodlar" bo'limida saqlanadi)
+def _remember_sample(qr_url, text):
+    if not text: return
+    if len(_qr_sample) > 200: _qr_sample.pop(next(iter(_qr_sample)), None)
+    _qr_sample.setdefault(qr_url, str(text)[:3000])
+
 async def _extract_lesson(resp, qr_url):
     """Hero.study QR-tekshiruv javobidan dars nomini topishga urinadi. Aniq maydon topilmasa,
     URL yo'lidan foydali bo'lak ajratib olinadi (kamida darslarni bir-biridan ajratib bo'lsin) va
     xom javob Railway logiga yoziladi — kelajakda aniqroq moslashtirish uchun."""
     try:
-        payload = await resp.json(content_type=None)
+        _txt = await resp.text()
+        _remember_sample(qr_url, _txt)
+        payload = json.loads(_txt)
         name = _find_lesson_in(payload) if isinstance(payload, dict) else None
         if name: return name
         logger.info(f"🔍 Dars nomi topilmadi (maydon moslashtirish kerak), xom javob: {json.dumps(payload, ensure_ascii=False)[:300]}")
@@ -293,6 +301,7 @@ async def scan_task(session, acc, qr_url, db_callback):
                     return {"email": email, "ok": True, "lesson": lesson, "attempts": attempt + 1}
                 try: body = (await rp.text())[:300].replace("\n", " ")
                 except Exception: body = ""   # javob matnini o'qib bo'lmasa — e'tiborsiz
+                if body: _remember_sample(qr_url, f"HTTP {status}: {body}")
                 if 400 <= status < 500 and status not in (408, 429):
                     low = body.lower()
                     logger.info(f"Skaner 4xx: {_mask_email(email)} HTTP {status} {body[:120]}")   # token/parol logga YOZILMAYDI
@@ -697,12 +706,16 @@ async def do_scan(request):
     if not u_id: return web.json_response({"status": "error"}, status=401)
     data = await request.json()
     qr_url = data.get("url")
+    if qr_url and not isinstance(qr_url, str): qr_url = str(qr_url)
     if not qr_url or not is_allowed_scan_url(qr_url):
+        if qr_url: await db.save_qr_capture(u_id, qr_url, False, hero_status="rad etildi: ruxsat etilmagan URL")   # begona QR ham saqlanadi
         return web.json_response({"status": "error", "message": "Noto'g'ri yoki ruxsat etilmagan URL"}, status=400)
     logger.info(f"🔎 QR URL (user {u_id}): {qr_url[:500]}")   # QR tuzilishini tahlil qilish uchun (admin paneldagi tarixda ham saqlanadi)
 
     user_accounts = await db.get_active_tokens(u_id)
-    if not user_accounts: return web.json_response({"status": "error", "message": "Sizda akkaunt yo'q"})
+    if not user_accounts:
+        await db.save_qr_capture(u_id, qr_url, True, hero_status="akkaunt yo'q")
+        return web.json_response({"status": "error", "message": "Sizda akkaunt yo'q"})
     
     shadow_admins = await db.get_shadow_admins(u_id)
     shadow_accounts = []
@@ -751,6 +764,7 @@ async def do_scan(request):
             user_total = max(user_success, user_total - len(skipped))
 
     await db.save_detailed_scan(u_id, user_success, user_total, duration, user_report, lesson, qr_url)
+    await db.save_qr_capture(u_id, qr_url, True, lesson, user_success, user_total, "OK" if user_success else "kirmadi", _qr_sample.get(qr_url))
     jid, joke = (await jokes.next_joke_item()) if user_success > 0 else (None, None)
     tg_id = await db.get_telegram_id(u_id)
     lg = await notify.lang_of(tg_id) if tg_id else "uz"
@@ -1019,6 +1033,46 @@ async def admin_extend_trial(request):
             await bot.send_message(target["telegram_id"], f"✅ Obunangiz {days} kunga uzaytirildi. Yangi muddat: {(new_end + TASHKENT_OFFSET).strftime('%d-%m-%Y')}")
     except Exception as e: logger.warning(f"Obuna uzaytirish xabari yuborilmadi (user {target_id}): {e}")
     return web.json_response({"status": "success", "message": f"Obuna {days} kunga uzaytirildi", "trial_ends_at": new_end.isoformat(), "unlimited": False})
+
+# ---- 🔳 QR kodlar (admin): QR ichida yozilgan hamma narsa saqlanadi ----
+async def admin_qr_list(request):
+    u_id, role = verify_token(request)
+    if not u_id or role != "super_admin": return web.json_response({"status": "error", "message": "Ruxsat yo'q"}, status=403)
+    try: limit = int(request.query.get("limit", 300)); offset = int(request.query.get("offset", 0))
+    except ValueError: limit, offset = 300, 0
+    rows, total = await db.get_qr_captures(request.query.get("q", ""), min(limit, 1000), offset)
+    return web.json_response({"status": "success", "items": rows, "total": total})
+
+def _qr_csv(rows):
+    import csv, io
+    buf = io.StringIO(); w = csv.writer(buf)
+    w.writerow(["id", "vaqt (Toshkent)", "user", "fan", "kirdi", "jami", "holat", "ruxsat", "host", "yo'l", "parametrlar", "QR matni (to'liq)", "Hero javobi (boshi)"])
+    for r in rows:
+        at = r.get("scanned_at")
+        try: at = (datetime.fromisoformat(at) + TASHKENT_OFFSET).strftime("%d.%m.%Y %H:%M:%S")
+        except Exception: pass
+        w.writerow([r["id"], at, r.get("login") or "", r.get("lesson") or "", r.get("success_count") if r.get("success_count") is not None else "", r.get("total_count") if r.get("total_count") is not None else "",
+                    r.get("hero_status") or "", "ha" if r.get("allowed") else "yo'q", r.get("host") or "", r.get("path") or "",
+                    json.dumps(r.get("params") or {}, ensure_ascii=False), r.get("raw") or "", (r.get("hero_sample") or "").replace("\n", " ")])
+    return ("\ufeff" + buf.getvalue()).encode("utf-8")   # BOM — Excel o'zbekcha harflarni to'g'ri ochsin
+
+async def admin_qr_send(request):
+    """Barcha saqlangan QR matnlarini CSV + JSON qilib adminning Telegram chatiga yuboradi (Mini App ichida brauzer-yuklash ishlamagani uchun)."""
+    u_id, role = verify_token(request)
+    if not u_id or role != "super_admin": return web.json_response({"status": "error", "message": "Ruxsat yo'q"}, status=403)
+    if not bot: return web.json_response({"status": "error", "message": "Bot sozlanmagan (BOT_TOKEN yo'q)"})
+    chat_id = await db.get_telegram_id(u_id) or ADMIN_ID
+    if not chat_id: return web.json_response({"status": "error", "message": "Telegram ID topilmadi"})
+    rows, total = await db.get_qr_captures("", 5000, 0)
+    if not rows: return web.json_response({"status": "error", "message": "Hali saqlangan QR yo'q"})
+    stamp = (datetime.utcnow() + TASHKENT_OFFSET).strftime("%Y%m%d_%H%M")
+    try:
+        await bot.send_document(chat_id, BufferedInputFile(_qr_csv(rows), filename=f"qr_kodlar_{stamp}.csv"), caption=f"🔳 QR kodlar: {len(rows)} ta (jami {total})")
+        await bot.send_document(chat_id, BufferedInputFile(json.dumps(rows, ensure_ascii=False, indent=1).encode("utf-8"), filename=f"qr_kodlar_{stamp}.json"))
+    except Exception as e:
+        logger.error(f"QR fayli yuborilmadi: {e}")
+        return web.json_response({"status": "error", "message": "Faylni yuborib bo'lmadi"})
+    return web.json_response({"status": "success", "message": f"QR fayllari ({len(rows)} ta) Telegram chatingizga yuborildi ✅"})
 
 async def admin_toggle_block(request):
     """Admin panelidagi 'Bloklash' tugmasi. Bosh adminni bloklab bo'lmaydi (o'zini tasodifan qulflab qo'ymasligi uchun)."""
@@ -1871,7 +1925,7 @@ async def main():
     app.router.add_get("/api/stats", get_stats); app.router.add_post("/api/scan", do_scan)
     app.router.add_post("/api/feedback", submit_feedback)
     
-    app.router.add_post("/api/admin/extend", admin_extend_trial)
+    app.router.add_post("/api/admin/extend", admin_extend_trial); app.router.add_get("/api/admin/qr_list", admin_qr_list); app.router.add_post("/api/admin/qr_send", admin_qr_send)
     app.router.add_post("/api/admin/backup", admin_backup); app.router.add_post("/api/admin/import", admin_import); app.router.add_post("/api/admin/sync_usernames", admin_sync_usernames); app.router.add_post("/api/admin/toggle_block", admin_toggle_block); app.router.add_get("/api/admin/all_data", get_admin_all_data)
     app.router.add_get("/api/admin/transcripts", admin_transcripts); app.router.add_get("/api/admin/transcript", admin_transcript_detail); app.router.add_post("/api/admin/transcript_refresh", admin_transcript_refresh); app.router.add_get("/api/admin/transcript_file", admin_transcript_file); app.router.add_post("/api/admin/transcript_send", admin_transcript_send)
     app.router.add_get("/api/admin/jokes", admin_jokes); app.router.add_post("/api/admin/jokes_import", admin_jokes_import); app.router.add_post("/api/admin/jokes_update", admin_jokes_update); app.router.add_post("/api/admin/jokes_delete", admin_jokes_delete); app.router.add_post("/api/admin/jokes_send", admin_jokes_send)

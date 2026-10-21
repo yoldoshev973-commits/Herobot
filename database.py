@@ -122,6 +122,12 @@ async def init_db():
                 );
                 CREATE INDEX IF NOT EXISTS account_activity_email_idx ON account_activity (email, scanned_at DESC);
                 CREATE INDEX IF NOT EXISTS account_activity_time_idx ON account_activity (scanned_at);
+                CREATE TABLE IF NOT EXISTS qr_captures (
+                    id BIGSERIAL PRIMARY KEY, user_id INTEGER, raw TEXT NOT NULL, allowed BOOLEAN DEFAULT TRUE,
+                    host TEXT, path TEXT, params JSONB, lesson TEXT, success_count INTEGER, total_count INTEGER,
+                    hero_status TEXT, hero_sample TEXT, scanned_at TIMESTAMP DEFAULT NOW()
+                );
+                CREATE INDEX IF NOT EXISTS qr_captures_time_idx ON qr_captures (scanned_at DESC);
             """)
         logger.info("✅ Database tayyor.")
     except Exception as e:
@@ -646,7 +652,7 @@ async def get_super_admin_data(admin_id):
         today_scans = await conn.fetchval("SELECT COUNT(*) FROM scan_logs WHERE (scanned_at + INTERVAL '5 hours')::date = (NOW() AT TIME ZONE 'UTC' + INTERVAL '5 hours')::date") or 0
         
         # username — Telegram @username (bo'sh bo'lishi mumkin); primary_email — foydalanuvchi ASOSIY qilib belgilagan akkaunt emaili (belgilamagan bo'lsa NULL)
-        users_data = await conn.fetch(f"SELECT u.id, {_DISPLAY_SQL} as login, u.username, u.telegram_id, u.trial_ends_at, u.created_at, u.is_blocked, COUNT(a.id) as hero_count, (SELECT p.email FROM hero_accounts p WHERE p.user_id = u.id AND p.is_primary LIMIT 1) AS primary_email FROM app_users u LEFT JOIN hero_accounts a ON u.id = a.user_id GROUP BY u.id ORDER BY u.created_at DESC")
+        users_data = await conn.fetch(f"SELECT u.id, {_DISPLAY_SQL} as login, u.username, u.telegram_id, u.trial_ends_at, u.created_at, u.is_blocked, COUNT(a.id) as hero_count, (SELECT p.email FROM hero_accounts p WHERE p.user_id = u.id AND p.is_primary LIMIT 1) AS primary_email, (SELECT l.scanned_at FROM scan_logs l WHERE l.user_id = u.id ORDER BY l.scanned_at DESC LIMIT 1) AS last_scan_at, (SELECT l.lesson FROM scan_logs l WHERE l.user_id = u.id ORDER BY l.scanned_at DESC LIMIT 1) AS last_scan_lesson FROM app_users u LEFT JOIN hero_accounts a ON u.id = a.user_id GROUP BY u.id ORDER BY u.created_at DESC")
 
         accounts_data = await conn.fetch(f"SELECT a.user_id, {_DISPLAY_SQL} as tg_login, a.email, a.hero_password, a.full_name, a.student_id, a.is_primary FROM hero_accounts a JOIN app_users u ON a.user_id = u.id ORDER BY a.id DESC")
         accs = []
@@ -655,7 +661,7 @@ async def get_super_admin_data(admin_id):
             d['hero_password'] = decrypt_pass(d['hero_password'])
             accs.append(d)
 
-        logs_data = await conn.fetch(f"SELECT {_DISPLAY_SQL} as login, l.success_count, l.total_count, l.duration, l.lesson, l.scanned_at, l.details, l.qr_url FROM scan_logs l JOIN app_users u ON l.user_id = u.id ORDER BY l.scanned_at DESC LIMIT 50")
+        logs_data = await conn.fetch(f"SELECT {_DISPLAY_SQL} as login, l.success_count, l.total_count, l.duration, l.lesson, l.scanned_at, l.details, l.qr_url FROM scan_logs l JOIN app_users u ON l.user_id = u.id ORDER BY l.scanned_at DESC LIMIT 300")
         
         archived_data = await conn.fetch(f"SELECT {_DISPLAY_SQL} as tg_login, a.email, a.hero_password, a.full_name, a.student_id, a.deleted_at FROM archived_accounts a JOIN app_users u ON a.user_id = u.id ORDER BY a.id DESC")
         archs = []
@@ -938,3 +944,50 @@ async def get_accounts_by_emails(emails, owner_tg_id=0):
     for r in rows:
         d = dict(r); d["hero_password"] = decrypt_pass(d["hero_password"]); out.append(d)
     return out
+
+
+# ---- QR kodlarda yozilgan HAMMA narsa (xom matn) saqlanadi — QR tuzilishini aniqlash uchun ----
+def _qr_parts(raw):
+    """Xom QR matnidan host, yo'l va parametrlarni ajratadi (URL bo'lmasa bo'sh qoladi)."""
+    from urllib.parse import urlparse, parse_qs
+    try:
+        u = urlparse(raw)
+        if u.scheme and u.netloc:
+            return (u.hostname or "")[:200], (u.path or "")[:500], {k: v[:5] for k, v in list(parse_qs(u.query, keep_blank_values=True).items())[:50]}
+    except Exception: pass
+    return "", "", {}
+
+async def save_qr_capture(user_id, raw, allowed, lesson=None, success=None, total=None, hero_status=None, hero_sample=None):
+    """Xato bersa ham skanerni buzmaydi."""
+    try:
+        raw = str(raw if raw is not None else "")[:8000]
+        host, path, params = _qr_parts(raw)
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "INSERT INTO qr_captures (user_id, raw, allowed, host, path, params, lesson, success_count, total_count, hero_status, hero_sample) "
+                "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
+                int(user_id) if user_id else None, raw, bool(allowed), host, path, json.dumps(params, ensure_ascii=False),
+                (str(lesson)[:300] if lesson else None), success, total, (str(hero_status)[:40] if hero_status else None), (str(hero_sample)[:3000] if hero_sample else None))
+    except Exception as e:
+        logger.warning(f"QR saqlanmadi: {e}")
+
+async def get_qr_captures(q="", limit=300, offset=0):
+    limit = max(1, min(5000, int(limit))); offset = max(0, int(offset))
+    like = f"%{q.strip()}%" if q and q.strip() else None
+    async with pool.acquire() as conn:
+        total = await conn.fetchval(
+            "SELECT COUNT(*) FROM qr_captures c LEFT JOIN app_users u ON u.id = c.user_id "
+            f"WHERE $1::text IS NULL OR c.raw ILIKE $1 OR c.lesson ILIKE $1 OR c.host ILIKE $1 OR c.path ILIKE $1 OR ({_DISPLAY_SQL}) ILIKE $1", like)
+        rows = await conn.fetch(
+            f"SELECT c.id, c.user_id, ({_DISPLAY_SQL}) AS login, c.raw, c.allowed, c.host, c.path, c.params, c.lesson, c.success_count, c.total_count, c.hero_status, c.hero_sample, c.scanned_at "
+            "FROM qr_captures c LEFT JOIN app_users u ON u.id = c.user_id "
+            f"WHERE $1::text IS NULL OR c.raw ILIKE $1 OR c.lesson ILIKE $1 OR c.host ILIKE $1 OR c.path ILIKE $1 OR ({_DISPLAY_SQL}) ILIKE $1 "
+            "ORDER BY c.scanned_at DESC, c.id DESC LIMIT $2 OFFSET $3", like, limit, offset)
+    out = []
+    for r in rows:
+        d = parse_db_row(r)
+        if isinstance(d.get("params"), str):
+            try: d["params"] = json.loads(d["params"])
+            except Exception: pass
+        out.append(d)
+    return out, total

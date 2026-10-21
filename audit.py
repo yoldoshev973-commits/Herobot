@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 SENSITIVE_GET = {"/api/admin/transcript", "/api/admin/transcript_file", "/api/admin/schedule", "/api/admin/acct_detail"}
 HIDE_KEYS = {"password", "pass", "token", "text", "code", "data", "raw", "hero_password", "message", "new_pass", "new_password", "pwd", "bearer", "authorization", "secret"}
 LABELS = {
-    "/api/admin/extend": "Obuna muddati uzaytirildi", "/api/admin/toggle_block": "Foydalanuvchi bloklandi/blokdan chiqarildi",
+    "/api/admin/extend": "Obuna muddati uzaytirildi", "/api/admin/qr_send": "QR kodlar fayli yuborildi", "/api/admin/toggle_block": "Foydalanuvchi bloklandi/blokdan chiqarildi",
     "/api/admin/backup": "Zaxira olindi", "/api/admin/import": "Zaxiradan import qilindi", "/api/admin/sync_usernames": "Username'lar yangilandi",
     "/api/admin/lessons_toggle": "Avto-yuborish yoqildi/o'chirildi", "/api/admin/schedule_refresh": "Jadval yangilandi", "/api/admin/transcript_refresh": "Transcript yangilandi",
     "/api/admin/transcript_send": "Transcript fayli yuborildi", "/api/admin/transcript_file": "Transcript fayli ko'rildi", "/api/admin/transcript": "Transcript ko'rildi",

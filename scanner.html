@@ -635,6 +635,7 @@
     <button class="tab-btn active-tab" onclick="showAdminSection('secUsers', this)">👥 Userlar</button>
     <button class="tab-btn" onclick="showAdminSection('secPaid', this)">💎 Pullik rejim</button>
     <button class="tab-btn" onclick="showAdminSection('secPass',  this)">🔐 Parollar</button>
+    <button class="tab-btn" onclick="showAdminSection('secQr', this)">🔳 QR kodlar</button>
     <button class="tab-btn" onclick="showAdminSection('secLogs',  this)">⏱ Tarix</button>
     <button class="tab-btn" onclick="showAdminSection('secReport', this)">📋 Hisobot</button>
     <button class="tab-btn" onclick="showAdminSection('secJokes', this)">😄 Hazillar</button>
@@ -649,7 +650,7 @@
     <button class="tab-btn" onclick="showAdminSection('secTranscript', this)">🎓 Transcript</button>
   </div>
 
-  <div id="secUsers" class="admin-section active"><div style="margin-bottom:10px"><button class="rp-chip" id="primFilterBtn" onclick="togglePrimFilter()">⭐ Asosiy Gmail belgilaganlar</button></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>User</th><th>Akk</th><th>Blok</th></tr></thead><tbody id="adminUsersList"></tbody></table></div></div>
+  <div id="secUsers" class="admin-section active"><div style="margin-bottom:10px"><button class="rp-chip" id="primFilterBtn" onclick="togglePrimFilter()">⭐ Asosiy Gmail belgilaganlar</button></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>User</th><th>Akk</th><th>Oxirgi skaner</th><th>Blok</th></tr></thead><tbody id="adminUsersList"></tbody></table></div></div>
   <div id="secPaid" class="admin-section">
     <div class="admin-grid" style="margin-bottom:12px">
       <div class="acard"><h3>Faol</h3><p id="paidActive">0</p></div>
@@ -664,6 +665,13 @@
       <button class="rp-chip" data-f="unlimited" onclick="setPaidFilter('unlimited')">♾ Cheksiz</button>
     </div>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>User</th><th>Holat</th><th>Tugash sanasi</th><th>Muddat qo'shish</th></tr></thead><tbody id="paidList"></tbody></table></div>
+  </div>
+  <div id="secQr" class="admin-section">
+    <div class="rp-period" style="margin-bottom:12px"><b>🔳 QR kodlarda yozilgan ma'lumot</b><span>Har bir skanerdagi QR matni to'liq saqlanadi (begona QR ham). Tuzilishini aniqlash uchun yuklab oling.</span></div>
+    <button class="btn btn-primary tool-wide" id="qrSendBtn" onclick="sendQrFiles()">⬇️ Hammasini yuklab olish (CSV + JSON)</button>
+    <input type="text" id="qrSearch" class="inp" placeholder="🔎 Qidirish: QR matni, fan, user..." oninput="qrSearchDebounced()">
+    <div id="qrCount" class="rp-note" style="margin-bottom:8px"></div>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Vaqt (Toshkent)</th><th>User / Fan</th><th>QR matni</th></tr></thead><tbody id="qrList"></tbody></table></div>
   </div>
   <div id="secPass" class="admin-section"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Egasi</th><th>Ism Familya</th><th>ID</th><th>Email</th><th>Parol</th></tr></thead><tbody id="adminPassList"></tbody></table></div></div>
   <div id="secHealth" class="admin-section">
@@ -713,7 +721,7 @@
     </div>
     <div id="rpBody"><div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div></div>
   </div>
-  <div id="secLogs" class="admin-section"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Mualif</th><th>Natija</th><th>Dars</th><th>Vaqt (Toshkent)</th></tr></thead><tbody id="adminLogsList"></tbody></table></div></div>
+  <div id="secLogs" class="admin-section"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Mualif</th><th>Natija</th><th>Skaner: fan va vaqt (Toshkent)</th></tr></thead><tbody id="adminLogsList"></tbody></table></div></div>
   <div id="secSched" class="admin-section">
     <div class="sch-bar">
       <select id="schedSel" class="inp" onchange="loadScheduleDetail(this.value)"></select>
@@ -836,6 +844,7 @@
     document.getElementById(sectionId).classList.add('active');
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active-tab'));
     if (btn) btn.classList.add('active-tab');
+    if (sectionId === 'secQr') loadQr();
     if (sectionId === 'secSched') loadSchedules();
     if (sectionId === 'secLessons') loadLessons();
     if (sectionId === 'secComp') loadComp();
@@ -1077,6 +1086,11 @@
     document.getElementById('resultJoke').style.display = 'none';
     document.getElementById('resultModal').style.display = 'flex';
   }
+  // Skaner ma'lumoti bitta katakda: fan + to'liq sana va vaqt (yil, soniyagacha, Toshkent vaqti)
+  function scanCell(lesson, at, nobody) {
+    const fan = lesson ? `<b>${esc(lesson)}</b>` : (nobody ? '<span style="color:var(--red);font-weight:600">Hech kim kirmadi</span>' : '<span style="color:var(--ink-lt)">fan noma\'lum</span>');
+    return `${fan}<br><span style="opacity:.75;white-space:nowrap">${at ? fmtDateTime(at) : '—'}</span>`;
+  }
   function openLog(idx) {
     const l = _adminLogs[idx]; if (!l) return;
     showResult(l.details, `${l.login} · ${l.success_count}/${l.total_count}${l.lesson ? ' · ' + l.lesson : ''}`, 'Skaner tafsiloti', fmtDateTime(l.scanned_at) + ' (Toshkent)', null, l.qr_url ? 'QR URL:\n' + l.qr_url : '');
@@ -1161,7 +1175,8 @@
     renderAdminUsers(); renderPaid();
     document.getElementById('adminPassList').innerHTML = d.accounts.map(a => `<tr><td>${esc(a.tg_login)}</td><td><b>${a.full_name ? esc(a.full_name) : '—'}</b></td><td>${a.student_id ? esc(a.student_id) : '—'}</td><td>${esc(a.email)}</td><td style="color:var(--green)">${esc(a.hero_password)}</td></tr>`).join('');
     _adminLogs = d.logs;
-    document.getElementById('adminLogsList').innerHTML = d.logs.map((l, idx) => `<tr style="cursor:pointer" onclick="openLog(${idx})"><td>${esc(l.login)}</td><td>${l.success_count}/${l.total_count}</td><td>${l.lesson ? esc(l.lesson) : (l.success_count === 0 ? '<span style="color:var(--red);font-weight:600">Hech kim kirmadi</span>' : '—')}</td><td style="white-space:nowrap">${fmtDate(l.scanned_at)}<br><span style="opacity:.7">${fmtTime(l.scanned_at)}</span></td></tr>`).join('');
+    document.getElementById('adminLogsList').innerHTML = d.logs.map((l, idx) => `<tr style="cursor:pointer" onclick="openLog(${idx})"><td>${esc(l.login)}</td><td>${l.success_count}/${l.total_count}</td><td style="white-space:normal">${scanCell(l.lesson, l.scanned_at, l.success_count === 0)}</td>
+</tr>`).join('');
     document.getElementById('adminArchList').innerHTML = d.archived.map(ar => `<tr><td>${esc(ar.tg_login)}</td><td><b>${ar.full_name ? esc(ar.full_name) : '—'}</b></td><td>${ar.student_id ? esc(ar.student_id) : '—'}</td><td>${esc(ar.email)}</td><td>${esc(ar.hero_password)}</td><td style="white-space:nowrap">${fmtDate(ar.deleted_at)}<br><span style="opacity:.7">${fmtTime(ar.deleted_at)}</span></td></tr>`).join('');
   }
 
@@ -1179,7 +1194,7 @@
       btn.classList.toggle('on', _primOnly);
     }
     const shown = _primOnly ? withPrim : _adminUsers;
-    document.getElementById('adminUsersList').innerHTML = !shown.length ? `<tr><td colspan="3" style="text-align:center;color:var(--ink-lt);white-space:normal">${_primOnly ? 'Hali hech kim asosiy Gmail belgilamagan' : 'Userlar yo\'q'}</td></tr>` : shown.map(u => {
+    document.getElementById('adminUsersList').innerHTML = !shown.length ? `<tr><td colspan="4" style="text-align:center;color:var(--ink-lt);white-space:normal">${_primOnly ? 'Hali hech kim asosiy Gmail belgilamagan' : 'Userlar yo\'q'}</td></tr>` : shown.map(u => {
       const adminBadge = _adminAdminIds.includes(u.id) ? `<span class="shadow-badge" style="background:rgba(var(--amber-rgb),.1);color:var(--amber);border-color:rgba(var(--amber-rgb),.25)">ADMIN</span>` : '';
       const isBlocked = !!u.is_blocked;
       const blockedBadge = isBlocked ? `<span class="shadow-badge" style="background:var(--red-bg);color:var(--red);border-color:rgba(var(--red-rgb),.25)">BLOKLANGAN</span>` : '';
@@ -1187,9 +1202,46 @@
       return `<tr>
         <td style="cursor:pointer" onclick="openUserAccs(${u.id})"><b>${esc(u.login)}</b>${adminBadge}${blockedBadge}${primLine}</td>
         <td style="cursor:pointer" onclick="openUserAccs(${u.id})">${u.hero_count} 📧</td>
+        <td style="white-space:normal">${u.last_scan_at ? scanCell(u.last_scan_lesson, u.last_scan_at, false) : '<span style="color:var(--ink-lt)">hali skaner qilmagan</span>'}</td>
         <td><button class="shadow-btn${isBlocked?' active-shadow':''}" style="${isBlocked?'background:var(--red-bg);color:var(--red);border-color:rgba(var(--red-rgb),.25)':''}" onclick="toggleBlock(${u.id},'${esc(escJs(u.login))}',${isBlocked})">${isBlocked?'✅ Ochish':'🚫 Blok'}</button></td>
       </tr>`;
     }).join('');
+  }
+
+  /* 🔳 QR kodlar (admin) */
+  let _qrT = null, _qrSeq = 0, _qrItems = [];
+  function qrSearchDebounced() { clearTimeout(_qrT); _qrT = setTimeout(loadQr, 350); }
+  async function loadQr() {
+    const tb = document.getElementById('qrList'); if (!tb) return;
+    const seq = ++_qrSeq, q = (document.getElementById('qrSearch').value || '').trim();
+    try {
+      const d = await (await fetch('/api/admin/qr_list?limit=300&q=' + encodeURIComponent(q), { headers: getHeaders() })).json();
+      if (seq !== _qrSeq) return;
+      if (d.status !== 'success') { tb.innerHTML = `<tr><td colspan="3" style="white-space:normal">${esc(d.message || 'Xatolik')}</td></tr>`; return; }
+      _qrItems = d.items || [];
+      document.getElementById('qrCount').textContent = `Jami saqlangan: ${d.total}${d.total > _qrItems.length ? ` (oxirgi ${_qrItems.length} tasi ko'rsatilmoqda — hammasi yuklab olinadigan faylda)` : ''}`;
+      tb.innerHTML = !_qrItems.length ? `<tr><td colspan="3" style="text-align:center;color:var(--ink-lt);white-space:normal">Hali QR saqlanmagan</td></tr>` : _qrItems.map((r, i) => {
+        const res = r.allowed === false ? `<span class="paid-st bad">⛔ begona QR</span>` : (r.total_count != null ? `<span class="paid-st ${r.success_count ? 'ok' : 'bad'}">${r.success_count}/${r.total_count}</span>` : '');
+        const par = r.params && Object.keys(r.params).length ? `<div class="who">param: ${esc(Object.keys(r.params).join(', '))}</div>` : '';
+        return `<tr style="cursor:pointer" onclick="openQr(${i})"><td style="white-space:nowrap">${fmtDateTime(r.scanned_at)}</td>
+          <td style="white-space:normal"><b>${esc(r.login || '—')}</b> ${res}<div class="who">${r.lesson ? esc(r.lesson) : 'fan noma\'lum'}</div></td>
+          <td style="white-space:normal;word-break:break-all;max-width:320px">${esc((r.raw || '').slice(0, 160))}${(r.raw || '').length > 160 ? '…' : ''}${par}</td></tr>`;
+      }).join('');
+    } catch (e) { if (seq === _qrSeq) tb.innerHTML = `<tr><td colspan="3" style="white-space:normal">Yuklab bo'lmadi</td></tr>`; }
+  }
+  function openQr(i) {
+    const r = _qrItems[i]; if (!r) return;
+    const note = `QR matni (to'liq):\n${r.raw}\n\nHost: ${r.host || '—'}\nYo'l: ${r.path || '—'}\nParametrlar: ${JSON.stringify(r.params || {})}\n\nHero javobi:\n${r.hero_sample || '—'}`;
+    showResult([], `${r.login || ''}${r.lesson ? ' · ' + r.lesson : ''}`, 'QR tafsiloti', fmtDateTime(r.scanned_at) + ' (Toshkent)', null, note);
+  }
+  async function sendQrFiles() {
+    const btn = document.getElementById('qrSendBtn'); if (btn.disabled) return;
+    const label = btn.textContent; btn.disabled = true; btn.textContent = '⏳ Tayyorlanmoqda...';
+    try {
+      const r = await (await fetch('/api/admin/qr_send', { method: 'POST', headers: getHeaders() })).json();
+      showNotify(r.message || 'Xatolik', r.status === 'success');
+    } catch (e) { showNotify('Xatolik', false); }
+    finally { btn.disabled = false; btn.textContent = label; }
   }
 
   /* Dars jadvali (admin) */

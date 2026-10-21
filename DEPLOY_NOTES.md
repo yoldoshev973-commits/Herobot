@@ -87,3 +87,13 @@ Deploy tartibi:
 - Muddat qo'shish: +7 / +30 / +90 yoki o'zingiz kiritgan kun (1–365). `/api/admin/extend` endi `days` parametrini qabul qiladi (bo'lmasa 30).
 - «Userlar» bo'limidan Obuna va +30 kun ustunlari olib tashlandi (tushunarliroq bo'lishi uchun).
 - Baza o'zgarmaydi, qo'lda hech narsa qilish shart emas.
+
+## fixed8 — Skaner ma'lumoti ustuni
+- «Tarix» bo'limida Dars/Vaqt o'rniga bitta ustun: fan + to'liq sana va vaqt (yil, soniyagacha, Toshkent). Oxirgi 300 ta skaner ko'rinadi (avval 50).
+- «Userlar» bo'limida yangi «Oxirgi skaner» ustuni (fan va vaqt).
+- Baza o'zgarmaydi: ma'lumot avvaldan `scan_logs` da saqlanib kelgan.
+
+## fixed9 — 🔳 QR kodlar bo'limi
+- Yangi jadval `qr_captures` (avtomatik yaratiladi): har skanerda QR ichidagi to'liq matn, host/yo'l/parametrlar, fan, natija va Hero javobining boshi saqlanadi. Begona (hero.study bo'lmagan) QR ham saqlanadi, lekin skanerlanmaydi. Eski skanerlar uchun faqat `scan_logs.qr_url` bor, ular bu jadvalga o'tmaydi.
+- Admin panelda «🔳 QR kodlar»: qidiruv, qatorni bossangiz to'liq tafsilot.
+- «Hammasini yuklab olish» — CSV (Excel uchun) + JSON fayllari Telegram chatingizga yuboriladi (Mini App ichida oddiy yuklash ishlamagani uchun, zaxira kabi).
