@@ -128,6 +128,12 @@ async def init_db():
                     hero_status TEXT, hero_sample TEXT, scanned_at TIMESTAMP DEFAULT NOW()
                 );
                 CREATE INDEX IF NOT EXISTS qr_captures_time_idx ON qr_captures (scanned_at DESC);
+                ALTER TABLE qr_captures ADD COLUMN IF NOT EXISTS stream_id TEXT;
+                ALTER TABLE qr_captures ADD COLUMN IF NOT EXISTS qr_subject TEXT;
+                ALTER TABLE qr_captures ADD COLUMN IF NOT EXISTS event_type TEXT;
+                ALTER TABLE qr_captures ADD COLUMN IF NOT EXISTS qr_begin BIGINT;
+                ALTER TABLE qr_captures ADD COLUMN IF NOT EXISTS qr_end BIGINT;
+                CREATE INDEX IF NOT EXISTS qr_captures_subject_idx ON qr_captures (lower(qr_subject));
             """)
         logger.info("✅ Database tayyor.")
     except Exception as e:
@@ -947,6 +953,14 @@ async def get_accounts_by_emails(emails, owner_tg_id=0):
 
 
 # ---- QR kodlarda yozilgan HAMMA narsa (xom matn) saqlanadi — QR tuzilishini aniqlash uchun ----
+def _to_epoch_sec(v):
+    """QR'dagi begin_time/end_time soniya yoki millisoniyada bo'lishi mumkin; har doim soniyaga keltiramiz."""
+    try:
+        n = int(float(v))
+        return n // 1000 if n > 10_000_000_000 else n   # ~11 xonali bo'lsa — millisoniya
+    except (TypeError, ValueError):
+        return None
+
 def _qr_parts(raw):
     """Xom QR matnidan host, yo'l va parametrlarni ajratadi (URL bo'lmasa bo'sh qoladi)."""
     from urllib.parse import urlparse, parse_qs
@@ -957,19 +971,34 @@ def _qr_parts(raw):
     except Exception: pass
     return "", "", {}
 
-async def save_qr_capture(user_id, raw, allowed, lesson=None, success=None, total=None, hero_status=None, hero_sample=None):
-    """Xato bersa ham skanerni buzmaydi."""
+async def save_qr_capture(user_id, raw, allowed, lesson=None, success=None, total=None, hero_status=None, hero_sample=None,
+                           stream_id=None, qr_subject=None, event_type=None, qr_begin=None, qr_end=None):
+    """Xato bersa ham skanerni buzmaydi. stream_id/qr_subject/event_type — QR ichiga base64 bilan yashirilgan
+    guruh (stream) ma'lumoti, QR tuzilishini dekodlab topiladi (main.py: decode_qr_meta)."""
     try:
         raw = str(raw if raw is not None else "")[:8000]
         host, path, params = _qr_parts(raw)
         async with pool.acquire() as conn:
             await conn.execute(
-                "INSERT INTO qr_captures (user_id, raw, allowed, host, path, params, lesson, success_count, total_count, hero_status, hero_sample) "
-                "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
+                "INSERT INTO qr_captures (user_id, raw, allowed, host, path, params, lesson, success_count, total_count, hero_status, hero_sample, stream_id, qr_subject, event_type, qr_begin, qr_end) "
+                "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)",
                 int(user_id) if user_id else None, raw, bool(allowed), host, path, json.dumps(params, ensure_ascii=False),
-                (str(lesson)[:300] if lesson else None), success, total, (str(hero_status)[:40] if hero_status else None), (str(hero_sample)[:3000] if hero_sample else None))
+                (str(lesson)[:300] if lesson else None), success, total, (str(hero_status)[:40] if hero_status else None), (str(hero_sample)[:3000] if hero_sample else None),
+                (str(stream_id)[:60] if stream_id else None), (str(qr_subject)[:300] if qr_subject else None), (str(event_type)[:40] if event_type else None),
+                _to_epoch_sec(qr_begin), _to_epoch_sec(qr_end))
     except Exception as e:
         logger.warning(f"QR saqlanmadi: {e}")
+
+
+async def get_subject_stream_map():
+    """Har bir fan (subject) uchun QR'dan so'nggi marta topilgan guruh (stream) ID'si.
+    Kalit — fan nomi kichik harflarda (dars jadvalidagi sarlavha bilan moslashtirish uchun)."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT DISTINCT ON (lower(qr_subject)) qr_subject, stream_id, event_type, scanned_at "
+            "FROM qr_captures WHERE stream_id IS NOT NULL AND qr_subject IS NOT NULL "
+            "ORDER BY lower(qr_subject), scanned_at DESC")
+    return {r["qr_subject"].strip().lower(): {"subject": r["qr_subject"], "stream_id": r["stream_id"], "event_type": r["event_type"], "scanned_at": r["scanned_at"].isoformat()} for r in rows if r["qr_subject"]}
 
 async def get_qr_captures(q="", limit=300, offset=0):
     limit = max(1, min(5000, int(limit))); offset = max(0, int(offset))
@@ -979,7 +1008,7 @@ async def get_qr_captures(q="", limit=300, offset=0):
             "SELECT COUNT(*) FROM qr_captures c LEFT JOIN app_users u ON u.id = c.user_id "
             f"WHERE $1::text IS NULL OR c.raw ILIKE $1 OR c.lesson ILIKE $1 OR c.host ILIKE $1 OR c.path ILIKE $1 OR ({_DISPLAY_SQL}) ILIKE $1", like)
         rows = await conn.fetch(
-            f"SELECT c.id, c.user_id, ({_DISPLAY_SQL}) AS login, c.raw, c.allowed, c.host, c.path, c.params, c.lesson, c.success_count, c.total_count, c.hero_status, c.hero_sample, c.scanned_at "
+            f"SELECT c.id, c.user_id, ({_DISPLAY_SQL}) AS login, c.raw, c.allowed, c.host, c.path, c.params, c.lesson, c.success_count, c.total_count, c.hero_status, c.hero_sample, c.stream_id, c.qr_subject, c.event_type, c.qr_begin, c.qr_end, c.scanned_at "
             "FROM qr_captures c LEFT JOIN app_users u ON u.id = c.user_id "
             f"WHERE $1::text IS NULL OR c.raw ILIKE $1 OR c.lesson ILIKE $1 OR c.host ILIKE $1 OR c.path ILIKE $1 OR ({_DISPLAY_SQL}) ILIKE $1 "
             "ORDER BY c.scanned_at DESC, c.id DESC LIMIT $2 OFFSET $3", like, limit, offset)

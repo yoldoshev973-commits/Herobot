@@ -186,6 +186,24 @@ def _find_lesson_in(obj, depth=0):
             if found: return found
     return None
 
+def decode_qr_meta(qr_url):
+    """QR havolasidagi 'url' parametri base64+JSON qilib yashirilgan (fan, guruh/stream ID, boshlanish/tugash vaqti).
+    Faqat O'QIYDI — hech narsa yaratmaydi yoki yubormaydi; maqsad: dars jadvalida guruh ID'sini ko'rsatish."""
+    try:
+        q = parse_qs(urlparse(qr_url).query)
+        raw_b64 = (q.get("url") or [None])[0]
+        if not raw_b64: return {}
+        import base64
+        pad = raw_b64 + "=" * (-len(raw_b64) % 4)
+        payload = json.loads(base64.b64decode(pad).decode("utf-8", errors="ignore"))
+        data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
+        if not isinstance(data, dict): return {}
+        return {"subject": data.get("subject"), "stream_id": data.get("stream_id") or data.get("streamId"),
+                "event_type": data.get("event_type") or data.get("eventType"),
+                "begin_time": data.get("begin_time") or data.get("beginTime"), "end_time": data.get("end_time") or data.get("endTime")}
+    except Exception:
+        return {}
+
 _qr_sample = {}    # qr_url -> Hero javobining boshi (QR tuzilishini tahlil qilish uchun admin "QR kodlar" bo'limida saqlanadi)
 def _remember_sample(qr_url, text):
     if not text: return
@@ -764,7 +782,10 @@ async def do_scan(request):
             user_total = max(user_success, user_total - len(skipped))
 
     await db.save_detailed_scan(u_id, user_success, user_total, duration, user_report, lesson, qr_url)
-    await db.save_qr_capture(u_id, qr_url, True, lesson, user_success, user_total, "OK" if user_success else "kirmadi", _qr_sample.get(qr_url))
+    _qr_meta = decode_qr_meta(qr_url)
+    await db.save_qr_capture(u_id, qr_url, True, lesson, user_success, user_total, "OK" if user_success else "kirmadi", _qr_sample.get(qr_url),
+                              stream_id=_qr_meta.get("stream_id"), qr_subject=_qr_meta.get("subject") or lesson, event_type=_qr_meta.get("event_type"),
+                              qr_begin=_qr_meta.get("begin_time"), qr_end=_qr_meta.get("end_time"))
     jid, joke = (await jokes.next_joke_item()) if user_success > 0 else (None, None)
     tg_id = await db.get_telegram_id(u_id)
     lg = await notify.lang_of(tg_id) if tg_id else "uz"
@@ -1112,6 +1133,15 @@ async def admin_schedule_detail(request):
     raw = db._jsonish(row["raw"])
     lessons = hero_schedule.normalize(raw)
     preview = None if lessons else json.dumps(raw, ensure_ascii=False)[:1500]   # parser moslashmasa, xom javobni ko'rsatamiz
+    stream_map = await db.get_subject_stream_map()   # QR'dan topilgan fan -> guruh (stream) ID xaritasi
+    for l in lessons:
+        title_lo = (l.get("title") or "").strip().lower()
+        info = stream_map.get(title_lo)
+        if not info:   # aniq mos kelmasa, bir-birini o'z ichiga olgan eng yaqin fan nomini qidiramiz
+            for subj, cand in stream_map.items():
+                if subj and title_lo and (subj in title_lo or title_lo in subj):
+                    info = cand; break
+        if info: l["stream_id"] = info.get("stream_id")
     return web.json_response({"status": "success", "email": email, "lessons": lessons, "error": row.get("error"),
                               "fetched_at": db.parse_db_row(row).get("fetched_at"), "raw_preview": preview,
                               "range": {"begin": row.get("range_begin"), "end": row.get("range_end")}})

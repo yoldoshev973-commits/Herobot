@@ -97,3 +97,14 @@ Deploy tartibi:
 - Yangi jadval `qr_captures` (avtomatik yaratiladi): har skanerda QR ichidagi to'liq matn, host/yo'l/parametrlar, fan, natija va Hero javobining boshi saqlanadi. Begona (hero.study bo'lmagan) QR ham saqlanadi, lekin skanerlanmaydi. Eski skanerlar uchun faqat `scan_logs.qr_url` bor, ular bu jadvalga o'tmaydi.
 - Admin panelda «🔳 QR kodlar»: qidiruv, qatorni bossangiz to'liq tafsilot.
 - «Hammasini yuklab olish» — CSV (Excel uchun) + JSON fayllari Telegram chatingizga yuboriladi (Mini App ichida oddiy yuklash ishlamagani uchun, zaxira kabi).
+
+## fixed10 — Dars jadvalida guruh (stream) ID'si
+- Har QR skaner qilinganda QR ichidagi (base64) matn o'qib ko'riladi: fan nomi, guruh (stream) ID, dars turi, boshlanish/tugash vaqti. Faqat O'QIYDI, hech narsa generatsiya qilmaydi/yubormaydi.
+- `qr_captures` jadvaliga yangi ustunlar: `stream_id`, `qr_subject`, `event_type` (avtomatik qo'shiladi).
+- «📅 Dars jadvali»da har dars nomi yonida, agar o'sha fan uchun QR'dan guruh ID aniqlangan bo'lsa, «ID: 2737» kabi chip chiqadi (fan nomi bo'yicha moslashtiriladi).
+- «🔳 QR kodlar» bo'limida ham fan/guruh ID ro'yxatda va tafsilotda ko'rinadi.
+- Eslatma: bu faqat ko'rish uchun — hech qanday avtomatik yoki QR'siz davomat belgilash qo'shilmadi.
+
+## fixed11 — QR'dagi boshlanish/tugash vaqti ham saqlanadi
+- `qr_captures` ga `qr_begin`, `qr_end` ustunlari qo'shildi (Unix vaqt, soniyada; agar QR millisoniyada bergan bo'lsa, o'zi soniyaga o'giradi).
+- «🔳 QR kodlar» tafsilotida endi: Fan (QR'dan), Guruh (stream) ID, Dars turi, Boshlanishi/Tugashi — hammasi Toshkent vaqtida ko'rsatiladi.

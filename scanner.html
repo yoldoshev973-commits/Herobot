@@ -1224,14 +1224,24 @@
         const res = r.allowed === false ? `<span class="paid-st bad">⛔ begona QR</span>` : (r.total_count != null ? `<span class="paid-st ${r.success_count ? 'ok' : 'bad'}">${r.success_count}/${r.total_count}</span>` : '');
         const par = r.params && Object.keys(r.params).length ? `<div class="who">param: ${esc(Object.keys(r.params).join(', '))}</div>` : '';
         return `<tr style="cursor:pointer" onclick="openQr(${i})"><td style="white-space:nowrap">${fmtDateTime(r.scanned_at)}</td>
-          <td style="white-space:normal"><b>${esc(r.login || '—')}</b> ${res}<div class="who">${r.lesson ? esc(r.lesson) : 'fan noma\'lum'}</div></td>
+          <td style="white-space:normal"><b>${esc(r.login || '—')}</b> ${res}<div class="who">${r.lesson ? esc(r.lesson) : 'fan noma\'lum'}${r.stream_id ? ` · guruh ID: ${esc(r.stream_id)}` : ''}</div></td>
           <td style="white-space:normal;word-break:break-all;max-width:320px">${esc((r.raw || '').slice(0, 160))}${(r.raw || '').length > 160 ? '…' : ''}${par}</td></tr>`;
       }).join('');
     } catch (e) { if (seq === _qrSeq) tb.innerHTML = `<tr><td colspan="3" style="white-space:normal">Yuklab bo'lmadi</td></tr>`; }
   }
+  // Unix vaqt belgisi (soniya, UTC epoch) -> Toshkent vaqti sifatida chiroyli ko'rinish. Epoch — dunyo bo'yicha bitta
+  // moment, shuning uchun qaysi mintaqa deb "o'qish" shart emas: Date obyekti bu lahzani aniq saqlaydi, timeZone esa
+  // ko'rsatishda Toshkentga (+5, DST'siz) o'giradi — xuddi boshqa vaqtlarni Z qo'shib ko'rsatganimizdek.
+  function fmtEpoch(sec) {
+    if (!sec) return '—';
+    const d = new Date(sec * 1000);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('uz-UZ', { timeZone: 'Asia/Tashkent', day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' +
+           d.toLocaleTimeString('uz-UZ', { timeZone: 'Asia/Tashkent', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
   function openQr(i) {
     const r = _qrItems[i]; if (!r) return;
-    const note = `QR matni (to'liq):\n${r.raw}\n\nHost: ${r.host || '—'}\nYo'l: ${r.path || '—'}\nParametrlar: ${JSON.stringify(r.params || {})}\n\nHero javobi:\n${r.hero_sample || '—'}`;
+    const note = `QR matni (to'liq):\n${r.raw}\n\nHost: ${r.host || '—'}\nYo'l: ${r.path || '—'}\nParametrlar: ${JSON.stringify(r.params || {})}\nFan (QR'dan): ${r.qr_subject || '—'}\nGuruh (stream) ID: ${r.stream_id || '—'}\nDars turi: ${r.event_type || '—'}\nBoshlanishi (Toshkent): ${fmtEpoch(r.qr_begin)}\nTugashi (Toshkent): ${fmtEpoch(r.qr_end)}\n\nHero javobi:\n${r.hero_sample || '—'}`;
     showResult([], `${r.login || ''}${r.lesson ? ' · ' + r.lesson : ''}`, 'QR tafsiloti', fmtDateTime(r.scanned_at) + ' (Toshkent)', null, note);
   }
   async function sendQrFiles() {
@@ -1310,7 +1320,7 @@
         const live = date === now.date && l.start && l.end && l.start <= now.time && now.time < l.end;
         const sub = [l.teacher ? `👤 ${esc(l.teacher)}` : '', l.room ? `📍 ${esc(l.room)}` : ''].filter(Boolean).join(' &nbsp;·&nbsp; ');
         return `<div class="lesson${live ? ' now' : ''}"><div class="l-time">${esc(l.start || '—')}<span>${esc(l.end || '')}</span></div>
-          <div class="l-body"><div class="l-title">${esc(l.title)}</div>
+          <div class="l-body"><div class="l-title">${esc(l.title)}${l.stream_id ? ` <span class="l-chip" style="background:var(--sand);color:var(--ink-md)" title="QR kodlardan aniqlangan guruh (stream) ID'si">ID: ${esc(l.stream_id)}</span>` : ''}</div>
           ${l.type ? `<div style="margin-top:4px"><span class="l-chip">${esc(l.type)}</span>${live ? '<span class="l-chip" style="background:var(--green);color: var(--on-accent);border-color:var(--green)">Hozir</span>' : ''}</div>` : (live ? '<div style="margin-top:4px"><span class="l-chip" style="background:var(--green);color: var(--on-accent);border-color:var(--green)">Hozir</span></div>' : '')}
           ${sub ? `<div class="l-sub">${sub}</div>` : ''}</div></div>`;
       }).join('') + `</div>`;
