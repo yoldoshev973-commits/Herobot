@@ -143,6 +143,55 @@
   .l-people { font-size:12px; color:var(--ink-md); margin-top:8px; line-height:1.7; }
   .l-people .off { opacity:.5; }
   .auto-bar { display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--card); border:1px solid var(--latte); border-radius:14px; padding:10px 14px; margin-bottom:12px; font-size:12px; line-height:1.5; }
+  /* 🗂 Darslar jadvali + 🔳 QR kartalari (admin) — faqat mavjud CSS o'zgaruvchilari (light/dark) */
+  .lt-bar { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; margin-bottom:10px; }
+  .lt-bar .inp { margin-bottom:0; padding:11px 14px; font-size:13.5px; min-width:0; }
+  .lt-bar .lt-search { grid-column:1 / -1; }
+  .lt-tbl th { white-space:nowrap; }
+  .lt-tbl td { vertical-align:middle; }
+  .lt-row { cursor:pointer; }
+  .lt-row td:first-child { box-shadow:inset 3px 0 0 transparent; }
+  .lt-row.live td:first-child { box-shadow:inset 3px 0 0 var(--green); }
+  .lt-row.open td { background:var(--row-hover); }
+  .lt-row.newday td { border-top:2px solid var(--latte); }
+  .lt-date { font-weight:700; font-variant-numeric:tabular-nums; }
+  .lt-date small { display:block; font-size:11px; font-weight:600; color:var(--ink-lt); }
+  .lt-time { font-weight:700; font-variant-numeric:tabular-nums; }
+  .lt-time span { color:var(--ink-lt); font-weight:500; }
+  .lt-subj { white-space:normal !important; min-width:180px; max-width:280px; font-weight:600; line-height:1.4; }
+  .lt-sid { font-weight:700; font-variant-numeric:tabular-nums; color:var(--brown-dk); }
+  .lt-mute { color:var(--ink-lt); }
+  .lt-cnt { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; background:var(--sand); border:1px solid var(--latte); border-radius:999px; padding:4px 11px; color:var(--ink-md); }
+  .lt-cnt b { color:var(--ink); }
+  .lt-row.open .lt-cnt { background:var(--ink); border-color:var(--ink); color:var(--cream); } .lt-row.open .lt-cnt b { color:var(--cream); }
+  .tbl tbody tr.lt-detail td { white-space:normal; background:var(--cream); padding:6px 14px 16px; }
+  .tbl tbody tr.lt-detail:hover td { background:var(--cream); }
+  .lt-detail-in { position:sticky; left:14px; width:min(calc(100vw - 64px), 720px); }
+  .lt-detail-h { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-lt); margin:6px 0 8px; }
+  .lt-people { display:grid; gap:6px; }
+  .lt-p { display:flex; justify-content:space-between; align-items:center; gap:10px; background:var(--card); border:1px solid var(--latte); border-radius:12px; padding:9px 12px; font-size:13px; }
+  .lt-p .pn { font-weight:600; min-width:0; }
+  .lt-p .pe { display:block; font-size:12px; font-weight:400; color:var(--ink-md); word-break:break-all; margin-top:2px; }
+  .lt-more { display:block; width:100%; margin:0 0 20px; }
+  .qr-list { display:grid; gap:12px; margin-bottom:20px; }
+  .qr-card { background:var(--card); border:1px solid var(--latte); border-radius:16px; padding:14px 16px; cursor:pointer; box-shadow:var(--sh); }
+  .qr-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:12px; font-size:13px; }
+  .qr-head .who { margin-top:2px; }
+  .qr-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:8px; }
+  .qr-cell { background:var(--sand); border-radius:12px; padding:9px 12px; min-width:0; }
+  .qr-cell i { display:block; font-style:normal; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-lt); margin-bottom:3px; }
+  .qr-cell b { display:block; font-size:13.5px; font-weight:700; color:var(--ink); word-break:break-word; line-height:1.35; }
+  .qr-cell b.empty { color:var(--ink-lt); font-weight:500; }
+  .qr-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+  .qr-chip { display:inline-flex; gap:6px; max-width:100%; font-size:11.5px; background:var(--card); border:1px solid var(--latte); border-radius:8px; padding:3px 8px; color:var(--ink-md); word-break:break-all; }
+  .qr-chip i { font-style:normal; font-weight:700; color:var(--ink-lt); flex:none; }
+  .qr-card details, .qr-det details { margin-top:10px; }
+  .qr-card summary, .qr-det summary { font-size:12px; font-weight:600; color:var(--ink-md); cursor:pointer; }
+  .qr-kv { width:100%; border-collapse:collapse; font-size:12.5px; margin:4px 0 12px; }
+  .qr-kv td { padding:6px 4px; border-bottom:1px solid var(--sand); vertical-align:top; word-break:break-word; }
+  .qr-kv td:first-child { width:38%; color:var(--ink-lt); font-weight:600; }
+  .qr-det h4 { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-lt); margin:14px 0 4px; }
+  .qr-det pre { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11px; white-space:pre-wrap; word-break:break-all; background:var(--sand); border-radius:10px; padding:10px; margin-top:6px; color:var(--ink-md); }
   .sch-raw { font-size:11px; word-break:break-all; background:var(--sand); border-radius:10px; padding:10px; margin-top:8px; color:var(--ink-md); }
 
   
@@ -644,6 +693,7 @@
     <button class="tab-btn" onclick="showAdminSection('secAudit', this)">📜 Jurnal</button>
     <button class="tab-btn" onclick="showAdminSection('secArch',  this)">📦 Arxiv</button>
     <button class="tab-btn" onclick="showAdminSection('secSched', this)">📅 Dars jadvali</button>
+    <button class="tab-btn" onclick="showAdminSection('secLessonsTable', this)">🗂 Darslar jadvali</button>
     <button class="tab-btn" onclick="showAdminSection('secLessons', this)">📚 Darslar</button>
     <button class="tab-btn" onclick="showAdminSection('secComp', this)">🤝 Hamrohlar</button>
     <button class="tab-btn" onclick="showAdminSection('secAcct', this)">📒 Akkaunt tarixi</button>
@@ -671,7 +721,7 @@
     <button class="btn btn-primary tool-wide" id="qrSendBtn" onclick="sendQrFiles()">⬇️ Hammasini yuklab olish (CSV + JSON)</button>
     <input type="text" id="qrSearch" class="inp" placeholder="🔎 Qidirish: QR matni, fan, user..." oninput="qrSearchDebounced()">
     <div id="qrCount" class="rp-note" style="margin-bottom:8px"></div>
-    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Vaqt (Toshkent)</th><th>User / Fan</th><th>QR matni</th></tr></thead><tbody id="qrList"></tbody></table></div>
+    <div id="qrList" class="qr-list"></div>
   </div>
   <div id="secPass" class="admin-section"><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Egasi</th><th>Ism Familya</th><th>ID</th><th>Email</th><th>Parol</th></tr></thead><tbody id="adminPassList"></tbody></table></div></div>
   <div id="secHealth" class="admin-section">
@@ -751,6 +801,26 @@
       <button class="btn btn-brown" id="lessonsSyncBtn" onclick="lessonsSyncAll()">📥 Hero'dan yuklash</button>
     </div>
     <div id="lessonsBody"><div class="empty-box loading"><span class="spn"></span>Yuklanmoqda...</div></div>
+  </div>
+  <div id="secLessonsTable" class="admin-section">
+    <div class="rp-period" style="margin-bottom:12px"><b>🗂 Darslar jadvali</b><span>Doimiy katalog: asosiy qator — DARS (sana, vaqt, fan, stream, tur). Qatorni bossangiz shu darsi bor emaillar chiqadi.</span></div>
+    <div class="lt-bar">
+      <input type="text" id="ltSearch" class="inp lt-search" placeholder="🔎 Qidirish: fan, stream ID, o'qituvchi, xona, ism, email..." oninput="ltSearchDebounced()">
+      <select id="ltSubj" class="inp" onchange="ltFilterChanged()"><option value="">Barcha fanlar</option></select>
+      <select id="ltType" class="inp" onchange="ltFilterChanged()"><option value="">Barcha turlar</option></select>
+      <input type="date" id="ltFrom" class="inp" onchange="ltFilterChanged()" title="Sanadan">
+      <input type="date" id="ltTo" class="inp" onchange="ltFilterChanged()" title="Sanagacha">
+    </div>
+    <div class="rp-chips" id="ltChips">
+      <button class="rp-chip on" data-m="all" onclick="setLtMode('all')">Hammasi</button>
+      <button class="rp-chip" data-m="today" onclick="setLtMode('today')">📍 Bugun</button>
+      <button class="rp-chip" data-m="future" onclick="setLtMode('future')">⏭ Kelgusi</button>
+      <button class="rp-chip" data-m="past" onclick="setLtMode('past')">⏮ O'tgan</button>
+      <button class="rp-chip" onclick="ltReset()">✕ Tozalash</button>
+    </div>
+    <div id="ltCount" class="rp-note" style="margin-bottom:8px"></div>
+    <div class="tbl-wrap"><table class="tbl lt-tbl"><thead><tr><th>Sana</th><th>Vaqt</th><th>Fan</th><th>Stream ID</th><th>Stream</th><th>Dars turi</th><th>O'qituvchi</th><th>Xona</th><th>Email</th></tr></thead><tbody id="ltList"><tr><td colspan="9" style="text-align:center;color:var(--ink-lt)">Yuklanmoqda...</td></tr></tbody></table></div>
+    <button class="btn btn-secondary lt-more" id="ltMore" style="display:none" onclick="ltMore()">Yana ko'rsatish</button>
   </div>
   <div id="secTranscript" class="admin-section">
     <div class="sch-bar">
@@ -847,6 +917,7 @@
     if (sectionId === 'secQr') loadQr();
     if (sectionId === 'secSched') loadSchedules();
     if (sectionId === 'secLessons') loadLessons();
+    if (sectionId === 'secLessonsTable') loadLessonsTable();
     if (sectionId === 'secComp') loadComp();
     if (sectionId === 'secAcct') loadAcct();
     if (sectionId === 'secTranscript') loadTranscripts();
@@ -955,9 +1026,9 @@
     document.getElementById('resultList').innerHTML =
       (ok.length ? `<div class="grp-title ok">✅ Darsga kirdi (${ok.length})</div>${ok.map(row).join('')}` : '') +
       (no.length ? `<div class="grp-title no">❌ Kirmadi (${no.length})</div>${no.map(row).join('')}` : '') +
-      (!list.length ? `<div style="text-align:center;padding:20px;color:var(--ink-lt)">Ma'lumot yo'q</div>` : '');
+      (!list.length && !(note && note.html) ? `<div style="text-align:center;padding:20px;color:var(--ink-lt)">Ma'lumot yo'q</div>` : '');
     const nb = document.getElementById('resultNote');
-    nb.style.display = note ? 'block' : 'none'; nb.innerHTML = note ? esc(note).replace(/\n/g, '<br>') : '';
+    nb.style.display = note ? 'block' : 'none'; nb.innerHTML = note ? (note.html ? note.html : esc(note).replace(/\n/g, '<br>')) : '';
     const jb = document.getElementById('resultJoke');
     jb.style.display = joke ? 'block' : 'none'; jb.innerHTML = joke ? `<span class="joke-ic">😄</span>${esc(joke)}` : '';
     document.getElementById('resultModal').style.display = 'flex';
@@ -1212,22 +1283,51 @@
   let _qrT = null, _qrSeq = 0, _qrItems = [];
   function qrSearchDebounced() { clearTimeout(_qrT); _qrT = setTimeout(loadQr, 350); }
   async function loadQr() {
-    const tb = document.getElementById('qrList'); if (!tb) return;
+    const box = document.getElementById('qrList'); if (!box) return;
     const seq = ++_qrSeq, q = (document.getElementById('qrSearch').value || '').trim();
     try {
       const d = await (await fetch('/api/admin/qr_list?limit=300&q=' + encodeURIComponent(q), { headers: getHeaders() })).json();
       if (seq !== _qrSeq) return;
-      if (d.status !== 'success') { tb.innerHTML = `<tr><td colspan="3" style="white-space:normal">${esc(d.message || 'Xatolik')}</td></tr>`; return; }
+      if (d.status !== 'success') { box.innerHTML = `<div class="sch-err">${esc(d.message || 'Xatolik')}</div>`; return; }
       _qrItems = d.items || [];
       document.getElementById('qrCount').textContent = `Jami saqlangan: ${d.total}${d.total > _qrItems.length ? ` (oxirgi ${_qrItems.length} tasi ko'rsatilmoqda — hammasi yuklab olinadigan faylda)` : ''}`;
-      tb.innerHTML = !_qrItems.length ? `<tr><td colspan="3" style="text-align:center;color:var(--ink-lt);white-space:normal">Hali QR saqlanmagan</td></tr>` : _qrItems.map((r, i) => {
-        const res = r.allowed === false ? `<span class="paid-st bad">⛔ begona QR</span>` : (r.total_count != null ? `<span class="paid-st ${r.success_count ? 'ok' : 'bad'}">${r.success_count}/${r.total_count}</span>` : '');
-        const par = r.params && Object.keys(r.params).length ? `<div class="who">param: ${esc(Object.keys(r.params).join(', '))}</div>` : '';
-        return `<tr style="cursor:pointer" onclick="openQr(${i})"><td style="white-space:nowrap">${fmtDateTime(r.scanned_at)}</td>
-          <td style="white-space:normal"><b>${esc(r.login || '—')}</b> ${res}<div class="who">${r.lesson ? esc(r.lesson) : 'fan noma\'lum'}${r.stream_id ? ` · guruh ID: ${esc(r.stream_id)}` : ''}</div></td>
-          <td style="white-space:normal;word-break:break-all;max-width:320px">${esc((r.raw || '').slice(0, 160))}${(r.raw || '').length > 160 ? '…' : ''}${par}</td></tr>`;
-      }).join('');
-    } catch (e) { if (seq === _qrSeq) tb.innerHTML = `<tr><td colspan="3" style="white-space:normal">Yuklab bo'lmadi</td></tr>`; }
+      box.innerHTML = !_qrItems.length ? `<div style="text-align:center;padding:28px;background:var(--card);border-radius:16px;color:var(--ink-lt)">Hali QR saqlanmagan</div>` : _qrItems.map((r, i) => qrCard(r, i)).join('');
+    } catch (e) { if (seq === _qrSeq) box.innerHTML = `<div class="sch-err">Yuklab bo'lmadi</div>`; }
+  }
+  // QR yozuvidan asosiy maydonlar: avval bazadagi (saqlangan) qiymat, bo'lmasa dekodlangan matndan
+  const QR_META_KEYS = new Set(['subject', 'subjectname', 'lesson', 'lessonname', 'streamid', 'steamid', 'eventtype', 'begintime', 'begin', 'starttime', 'start', 'endtime', 'end', 'finishtime']);
+  function qrInfo(r) {
+    const dec = r.decoded || {}, m = dec.meta || {};
+    return { subject: r.qr_subject || m.subject || r.lesson || '', stream: r.stream_id || m.stream_id || '', type: r.event_type || m.event_type || '',
+             begin: r.qr_begin || m.begin_sec || null, end: r.qr_end || m.end_sec || null };
+  }
+  // Asosiy maydonlardan boshqa hamma narsa: dekodlangan JSON maydonlari + dekodlanmagan query parametrlar
+  function qrExtra(r) {
+    const dec = r.decoded || {}, out = [], seen = new Set();
+    Object.entries(dec.fields || {}).forEach(([k, v]) => {
+      if (QR_META_KEYS.has(String(k).split('.').pop().replace(/[_\-\s]/g, '').toLowerCase())) return;
+      out.push([k, v]);
+    });
+    const decodedParams = new Set((dec.decoded || []).map(x => x.param));
+    Object.entries(dec.params || r.params || {}).forEach(([k, v]) => { if (!decodedParams.has(k)) out.push([k, Array.isArray(v) ? v.join(', ') : v]); });
+    return out.filter(([k]) => !seen.has(k) && seen.add(k));
+  }
+  function qrChip(k, v) {
+    const t = v === null || v === undefined || v === '' ? '—' : String(v);
+    return `<span class="qr-chip" title="${esc(t)}"><i>${esc(k)}</i>${esc(t.length > 60 ? t.slice(0, 60) + '…' : t)}</span>`;
+  }
+  function qrCard(r, i) {
+    const f = qrInfo(r);
+    const res = r.allowed === false ? `<span class="paid-st bad">⛔ begona QR</span>` : (r.total_count != null ? `<span class="paid-st ${r.success_count ? 'ok' : 'bad'}">${r.success_count}/${r.total_count}</span>` : '');
+    const cell = (t, v) => `<div class="qr-cell"><i>${t}</i>${v ? `<b>${esc(v)}</b>` : `<b class="empty">—</b>`}</div>`;
+    const extra = qrExtra(r), shown = extra.slice(0, 8);
+    const dec = r.decoded || {};
+    const base = [dec.host ? ['host', dec.host] : null, dec.path ? ["yo'l", dec.path] : null].filter(Boolean);
+    return `<div class="qr-card" onclick="openQr(${i})">
+      <div class="qr-head"><div><b>${esc(r.login || '—')}</b> ${res}</div><div class="who" style="white-space:nowrap">${fmtDateTime(r.scanned_at)}</div></div>
+      <div class="qr-grid">${cell('Fan', f.subject)}${cell('Stream ID', f.stream)}${cell('Dars turi', ltType(f.type))}${cell('Boshlanish', f.begin ? fmtEpoch(f.begin) : '')}${cell('Tugash', f.end ? fmtEpoch(f.end) : '')}</div>
+      ${(base.length || shown.length) ? `<div class="qr-chips">${base.concat(shown).map(([k, v]) => qrChip(k, v)).join('')}${extra.length > shown.length ? `<span class="qr-chip"><i>+${extra.length - shown.length}</i>yana</span>` : ''}</div>` : ''}
+      <details onclick="event.stopPropagation()"><summary>To'liq matn</summary><div class="sch-raw">${esc(r.raw || '')}</div></details></div>`;
   }
   // Unix vaqt belgisi (soniya, UTC epoch) -> Toshkent vaqti sifatida chiroyli ko'rinish. Epoch — dunyo bo'yicha bitta
   // moment, shuning uchun qaysi mintaqa deb "o'qish" shart emas: Date obyekti bu lahzani aniq saqlaydi, timeZone esa
@@ -1241,8 +1341,19 @@
   }
   function openQr(i) {
     const r = _qrItems[i]; if (!r) return;
-    const note = `QR matni (to'liq):\n${r.raw}\n\nHost: ${r.host || '—'}\nYo'l: ${r.path || '—'}\nParametrlar: ${JSON.stringify(r.params || {})}\nFan (QR'dan): ${r.qr_subject || '—'}\nGuruh (stream) ID: ${r.stream_id || '—'}\nDars turi: ${r.event_type || '—'}\nBoshlanishi (Toshkent): ${fmtEpoch(r.qr_begin)}\nTugashi (Toshkent): ${fmtEpoch(r.qr_end)}\n\nHero javobi:\n${r.hero_sample || '—'}`;
-    showResult([], `${r.login || ''}${r.lesson ? ' · ' + r.lesson : ''}`, 'QR tafsiloti', fmtDateTime(r.scanned_at) + ' (Toshkent)', null, note);
+    const f = qrInfo(r), dec = r.decoded || {};
+    const kv = rows => `<table class="qr-kv">${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v === null || v === undefined || v === '' ? '—' : esc(v)}</td></tr>`).join('')}</table>`;
+    const pretty = x => { try { return JSON.stringify(x, null, 2); } catch (e) { return String(x); } };
+    const extra = qrExtra(r);
+    const decoded = (dec.decoded || []).map(x => `<details open><summary><b>${esc(x.param)}</b> · ${esc(x.encoding === 'base64' ? 'base64 dekodlandi' : x.encoding)}</summary><pre>${esc(x.json ? pretty(x.json) : x.text)}</pre></details>`).join('');
+    const html = `<div class="qr-det">
+      <h4>Asosiy</h4>${kv([['Fan', f.subject], ['Stream ID', f.stream], ['Dars turi', ltType(f.type)], ['Boshlanish (Toshkent)', f.begin ? fmtEpoch(f.begin) : ''], ['Tugash (Toshkent)', f.end ? fmtEpoch(f.end) : '']])}
+      <h4>Havola</h4>${kv([['Host', dec.host || r.host], ["Yo'l", dec.path || r.path]])}
+      ${extra.length ? `<h4>Qolgan maydonlar (${extra.length})</h4>${kv(extra)}` : ''}
+      ${decoded ? `<h4>Dekodlangan parametrlar</h4>${decoded}` : ''}
+      <details><summary>To'liq matn</summary><pre>${esc(r.raw || '')}</pre></details>
+      <details><summary>Hero javobi</summary><pre>${esc(r.hero_sample || '—')}</pre></details></div>`;
+    showResult([], `${r.login || ''}${r.lesson ? ' · ' + r.lesson : ''}`, 'QR tafsiloti', fmtDateTime(r.scanned_at) + ' (Toshkent)', null, { html });
   }
   async function sendQrFiles() {
     const btn = document.getElementById('qrSendBtn'); if (btn.disabled) return;
@@ -1252,6 +1363,93 @@
       showNotify(r.message || 'Xatolik', r.status === 'success');
     } catch (e) { showNotify('Xatolik', false); }
     finally { btn.disabled = false; btn.textContent = label; }
+  }
+
+  /* 🗂 Darslar jadvali (admin): asosiy qator = DARS; bosilganda shu darsi bor emaillar */
+  let _ltAll = [], _ltList = [], _ltOpen = new Set(), _ltShow = 150, _ltMode = 'all', _ltT = null, _ltSeq = 0;
+  const LT_TYPES = { lecture: "Ma'ruza", lec: "Ma'ruza", practice: 'Amaliy', practical: 'Amaliy', seminar: 'Seminar', lab: 'Laboratoriya', laboratory: 'Laboratoriya', exam: 'Imtihon', consultation: 'Konsultatsiya' };
+  function ltType(t) { if (!t) return ''; const k = String(t).trim().toLowerCase().replace(/[\s-]+/g, '_'); return LT_TYPES[k] || t; }
+  function ltSearchDebounced() { clearTimeout(_ltT); _ltT = setTimeout(ltFilterChanged, 200); }
+  function ltFilterChanged() { _ltShow = 150; ltRender(); }
+  function ltMore() { _ltShow += 150; ltRender(); }
+  function setLtMode(m) {
+    _ltMode = m;
+    document.querySelectorAll('#ltChips .rp-chip[data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+    ltFilterChanged();
+  }
+  function ltReset() {
+    ['ltSearch', 'ltSubj', 'ltType', 'ltFrom', 'ltTo'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    setLtMode('all');
+  }
+  async function loadLessonsTable() {
+    const seq = ++_ltSeq, tb = document.getElementById('ltList'); if (!tb) return;
+    try {
+      const d = await (await fetch('/api/admin/lessons_table', { headers: getHeaders() })).json();
+      if (seq !== _ltSeq) return;
+      if (d.status !== 'success') { tb.innerHTML = `<tr><td colspan="9" style="white-space:normal">${esc(d.message || 'Xatolik')}</td></tr>`; return; }
+      _ltAll = d.lessons || [];
+      const fill = (id, vals, label) => {
+        const el = document.getElementById(id), cur = el.value;
+        el.innerHTML = `<option value="">${label}</option>` + [...new Set(vals.filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b))).map(v => `<option value="${esc(v)}">${esc(id === 'ltType' ? ltType(v) : v)}</option>`).join('');
+        el.value = [...el.options].some(o => o.value === cur) ? cur : '';
+      };
+      fill('ltSubj', _ltAll.map(l => l.subject), 'Barcha fanlar');
+      fill('ltType', _ltAll.map(l => l.event_type), 'Barcha turlar');
+      ltRender();
+    } catch (e) { if (seq === _ltSeq) tb.innerHTML = `<tr><td colspan="9" style="white-space:normal">Yuklab bo'lmadi</td></tr>`; }
+  }
+  function ltFiltered() {
+    const v = id => (document.getElementById(id).value || '').trim();
+    const q = v('ltSearch').toLowerCase(), subj = v('ltSubj'), type = v('ltType'), from = v('ltFrom'), to = v('ltTo'), today = tashkentNow().date;
+    return _ltAll.filter(l => {
+      if (subj && l.subject !== subj) return false;
+      if (type && l.event_type !== type) return false;
+      if (from && l.date < from) return false;
+      if (to && l.date > to) return false;
+      if (_ltMode === 'today' && l.date !== today) return false;
+      if (_ltMode === 'future' && l.date <= today) return false;
+      if (_ltMode === 'past' && l.date >= today) return false;
+      if (!q) return true;
+      const hay = [l.date, l.start, l.subject, l.stream_id, l.stream, l.event_type, ltType(l.event_type), l.teacher, l.room]
+        .concat((l.people || []).flatMap(p => [p.name, p.student_id, p.email])).filter(Boolean).join(' ').toLowerCase();
+      return hay.includes(q);
+    });
+  }
+  function ltRender() {
+    const tb = document.getElementById('ltList'); if (!tb) return;
+    const all = ltFiltered(), list = all.slice(0, _ltShow), today = tashkentNow().date;
+    _ltList = list;
+    document.getElementById('ltCount').textContent = _ltAll.length ? `${all.length} ta dars${all.length !== _ltAll.length ? ` (jami ${_ltAll.length})` : ''} · ${all.reduce((n, l) => n + (l.count || 0), 0)} ta email bog'lanishi` : '';
+    const more = document.getElementById('ltMore'); more.style.display = all.length > list.length ? 'block' : 'none';
+    more.textContent = `Yana ko'rsatish (${all.length - list.length} ta qoldi)`;
+    if (!list.length) { tb.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--ink-lt);white-space:normal;padding:28px">${_ltAll.length ? 'Filtrga mos dars topilmadi' : "Katalog hali bo'sh — «📚 Darslar» bo'limida «Hero'dan yuklash» ni bosing"}</td></tr>`; return; }
+    const dash = '<span class="lt-mute">—</span>';
+    let prev = null;
+    tb.innerHTML = list.map((l, i) => {
+      const [y, m, dd] = (l.date || '').split('-').map(Number);
+      const dayName = y ? UZ_DAYS[new Date(y, m - 1, dd).getDay()] : '';
+      const open = _ltOpen.has(l.key), newday = prev !== null && prev !== l.date; prev = l.date;
+      let row = `<tr class="lt-row${l.live ? ' live' : ''}${open ? ' open' : ''}${newday ? ' newday' : ''}" onclick="ltToggle(${i})">
+        <td class="lt-date">${y ? `${String(dd).padStart(2, '0')}.${String(m).padStart(2, '0')}.${y}` : dash}<small>${esc(dayName)}${l.date === today ? ' · <span style="color:var(--green)">bugun</span>' : ''}</small></td>
+        <td class="lt-time">${esc(l.start || '—')}${l.end ? `<span> – ${esc(l.end)}</span>` : ''}${l.live ? ' <span class="paid-st ok" style="margin-left:4px">hozir</span>' : ''}</td>
+        <td class="lt-subj">${esc(l.subject)}</td>
+        <td>${l.stream_id ? `<span class="lt-sid">${esc(l.stream_id)}</span>` : dash}</td>
+        <td>${l.stream ? esc(l.stream) : dash}</td>
+        <td>${l.event_type ? `<span class="l-chip" title="${esc(l.event_type)}">${esc(ltType(l.event_type))}</span>` : dash}</td>
+        <td>${l.teacher ? esc(l.teacher) : dash}</td>
+        <td>${l.room ? esc(l.room) : dash}</td>
+        <td><span class="lt-cnt" title="${l.active_count} tasi faol"><b>${l.count}</b> email ${open ? '▾' : '▸'}</span></td></tr>`;
+      if (open) {
+        const ppl = (l.people || []).map(p => `<div class="lt-p"><span class="pn">${esc(p.name || '—')}${p.student_id ? ` <span class="lt-mute" style="font-weight:500">· ${esc(p.student_id)}</span>` : ''}<span class="pe">${esc(p.email)}</span></span>${!p.known ? '<span class="paid-st inf">o\'chirilgan</span>' : (p.active ? '<span class="paid-st ok">faol</span>' : '<span class="paid-st bad">nofaol</span>')}</div>`).join('');
+        row += `<tr class="lt-detail"><td colspan="9"><div class="lt-detail-in"><div class="lt-detail-h">Shu darsi bor emaillar (${l.count})</div><div class="lt-people">${ppl || '<div class="lt-mute" style="font-size:13px">Email yo\'q</div>'}</div></div></td></tr>`;
+      }
+      return row;
+    }).join('');
+  }
+  function ltToggle(i) {
+    const l = _ltList[i]; if (!l) return;
+    if (_ltOpen.has(l.key)) _ltOpen.delete(l.key); else _ltOpen.add(l.key);
+    ltRender();
   }
 
   /* Dars jadvali (admin) */

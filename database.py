@@ -1,3 +1,4 @@
+import asyncio
 import asyncpg
 import os
 import secrets
@@ -8,6 +9,7 @@ import logging
 import bcrypt
 from datetime import datetime
 import students
+import qr_decode
 from cryptography.fernet import Fernet
 
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -134,6 +136,16 @@ async def init_db():
                 ALTER TABLE qr_captures ADD COLUMN IF NOT EXISTS qr_begin BIGINT;
                 ALTER TABLE qr_captures ADD COLUMN IF NOT EXISTS qr_end BIGINT;
                 CREATE INDEX IF NOT EXISTS qr_captures_subject_idx ON qr_captures (lower(qr_subject));
+                CREATE TABLE IF NOT EXISTS lesson_catalog (
+                    lesson_key TEXT PRIMARY KEY, lesson_date TEXT NOT NULL, start_time TEXT NOT NULL, end_time TEXT,
+                    subject TEXT NOT NULL, stream_id TEXT, stream TEXT, event_type TEXT, teacher TEXT, room TEXT,
+                    created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW()
+                );
+                CREATE TABLE IF NOT EXISTS lesson_catalog_emails (
+                    lesson_key TEXT NOT NULL, email TEXT NOT NULL, PRIMARY KEY (lesson_key, email)
+                );
+                CREATE INDEX IF NOT EXISTS lesson_catalog_date_idx ON lesson_catalog (lesson_date DESC, start_time DESC);
+                CREATE INDEX IF NOT EXISTS lesson_catalog_emails_email_idx ON lesson_catalog_emails (email);
             """)
         logger.info("✅ Database tayyor.")
     except Exception as e:
@@ -173,7 +185,7 @@ async def get_or_create_user(telegram_id, username=None, full_name=None):
             if full_name: await conn.execute("UPDATE app_users SET full_name=$1 WHERE telegram_id=$2", full_name, telegram_id)
             return user['login'], None, user['trial_ends_at']
         password = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(10))
-        pass_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+        pass_hash = (await asyncio.to_thread(bcrypt.hashpw, password.encode(), bcrypt.gensalt())).decode()
         await conn.execute("INSERT INTO app_users (telegram_id, login, password, username, full_name) VALUES ($1, $2, $3, $4, $5)", telegram_id, login, pass_hash, username, full_name)
         new_user = await conn.fetchrow("SELECT trial_ends_at FROM app_users WHERE telegram_id=$1", telegram_id)
         return login, password, new_user['trial_ends_at']
@@ -240,7 +252,7 @@ async def reset_password(telegram_id):
     pw_changed_at ga hozirgi (naive UTC) vaqt yoziladi — eski JWT sessiyalar shu vaqtdan keyin ishlamaydi.
     Bloklangan foydalanuvchiga parol berilmaydi (None, None)."""
     password = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(10))
-    pass_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    pass_hash = (await asyncio.to_thread(bcrypt.hashpw, password.encode(), bcrypt.gensalt())).decode()
     async with pool.acquire() as conn:
         row = await conn.fetchrow("UPDATE app_users SET password=$1, pw_changed_at = NOW() AT TIME ZONE 'UTC' WHERE telegram_id=$2 AND NOT COALESCE(is_blocked, FALSE) RETURNING login", pass_hash, telegram_id)
     return (row['login'], password) if row else (None, None)
@@ -264,7 +276,7 @@ async def verify_login(login, password, admin_id):
         if not user: return None, "Login yoki parol xato"
         stored = user['password'] or ''
         try:
-            ok = bool(stored) and bcrypt.checkpw(password.encode(), stored.encode())
+            ok = bool(stored) and await asyncio.to_thread(bcrypt.checkpw, password.encode(), stored.encode())
         except (ValueError, AttributeError):
             ok = bool(stored) and hmac.compare_digest(password.encode(), stored.encode())  # eski, shifrlanmagan qatorlar uchun himoya
         if not ok: return None, "Login yoki parol xato"
@@ -294,7 +306,7 @@ async def add_hero_account(user_id, email, password, token="NO_TOKEN"):
     enc_pass = encrypt_pass(password)
     st = students.lookup(email) or {}
     async with pool.acquire() as conn:
-        await conn.execute("INSERT INTO hero_accounts (user_id, email, hero_password, bearer_token, student_id, full_name) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (user_id, email) DO UPDATE SET hero_password=$3, bearer_token=$4, student_id=$5, full_name=$6", int(user_id), email, enc_pass, token, st.get("student_id"), st.get("full_name"))
+        await conn.execute("INSERT INTO hero_accounts (user_id, email, hero_password, bearer_token, student_id, full_name) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (user_id, email) DO UPDATE SET hero_password=$3, bearer_token=$4, student_id=COALESCE($5, hero_accounts.student_id), full_name=COALESCE($6, hero_accounts.full_name)", int(user_id), email, enc_pass, token, st.get("student_id"), st.get("full_name"))
 
 async def backfill_student_info():
     """Bazada allaqachon bor akkauntlar (ism/ID yo'q) uchun ro'yxatdan ism va ID ni to'ldiradi. Qaytaradi: (yangilandi, topilmadi)."""
@@ -355,6 +367,7 @@ async def admin_delete_accounts(email):
                                    r["user_id"], r["email"], r["hero_password"], r["student_id"], r["full_name"])
             await conn.execute("DELETE FROM hero_accounts WHERE email=$1", email)
             await conn.execute("DELETE FROM hero_schedules WHERE email=$1", email)
+            await conn.execute("DELETE FROM lesson_catalog_emails WHERE email=$1", email)
             await conn.execute("DELETE FROM hero_transcripts WHERE email=$1", email)
     return len(rows)
 
@@ -385,7 +398,7 @@ def _activity_rows(details, user_id, scan_log_id, lesson, kind):
 
 async def save_detailed_scan(user_id, success, total, duration, details, lesson=None, qr_url=None):
     async with pool.acquire() as conn:
-        log_id = await conn.fetchval("INSERT INTO scan_logs (user_id, success_count, total_count, duration, details, lesson, qr_url) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id", int(user_id), success, total, duration, json.dumps(details), lesson, (str(qr_url)[:2000] if qr_url else None))
+        log_id = await conn.fetchval("INSERT INTO scan_logs (user_id, success_count, total_count, duration, details, lesson, qr_url) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id", int(user_id), success, total, duration, json.dumps(details), (str(lesson)[:160] if lesson else None), (str(qr_url)[:2000] if qr_url else None))
         try:   # akkaunt tarixi — xato bersa skaner/log buzilmasin
             clean, kind = _split_lesson_kind(lesson)
             rows = _activity_rows(details, user_id, log_id, clean, kind)
@@ -829,7 +842,7 @@ async def import_backup_data(data):
                         new_id = row["id"]
                         async with conn.transaction():
                             await conn.execute(
-                                "UPDATE app_users SET trial_ends_at=GREATEST(trial_ends_at, COALESCE($1, trial_ends_at)), "
+                                "UPDATE app_users SET trial_ends_at=CASE WHEN trial_ends_at IS NULL THEN NULL ELSE GREATEST(trial_ends_at, COALESCE($1, trial_ends_at)) END, "
                                 "is_admin=(is_admin OR $2), is_blocked=(is_blocked OR $3), "
                                 "username=COALESCE(username, $4), full_name=COALESCE(full_name, $5), phone_number=COALESCE(phone_number, $6) "
                                 "WHERE id=$7",
@@ -944,7 +957,7 @@ async def get_accounts_by_emails(emails, owner_tg_id=0):
             "EXISTS(SELECT 1 FROM hero_accounts p WHERE p.user_id = a.user_id AND p.is_primary) AS has_primary "
             "FROM hero_accounts a JOIN app_users u ON u.id = a.user_id "
             "WHERE a.email = ANY($1::text[]) AND u.is_blocked = FALSE "
-            "AND (u.is_admin = TRUE OR u.telegram_id = $2 OR u.trial_ends_at > NOW()) ORDER BY a.id DESC",
+            "AND (u.is_admin = TRUE OR u.telegram_id = $2 OR u.trial_ends_at IS NULL OR u.trial_ends_at > NOW()) ORDER BY a.id DESC",
             emails, int(owner_tg_id or 0))
     out = []
     for r in rows:
@@ -963,11 +976,10 @@ def _to_epoch_sec(v):
 
 def _qr_parts(raw):
     """Xom QR matnidan host, yo'l va parametrlarni ajratadi (URL bo'lmasa bo'sh qoladi)."""
-    from urllib.parse import urlparse, parse_qs
-    try:
-        u = urlparse(raw)
-        if u.scheme and u.netloc:
-            return (u.hostname or "")[:200], (u.path or "")[:500], {k: v[:5] for k, v in list(parse_qs(u.query, keep_blank_values=True).items())[:50]}
+    try:   # parse_qs base64 dagi '+' ni bo'shliqqa aylantiradi — shuning uchun qo'lda (qr_decode.split_query)
+        d = qr_decode.decode_qr_full(raw)
+        if d["host"]:
+            return d["host"][:200], d["path"][:500], {k: (v if isinstance(v, list) else [v])[:5] for k, v in list(d["params"].items())[:50]}
     except Exception: pass
     return "", "", {}
 
@@ -1018,5 +1030,47 @@ async def get_qr_captures(q="", limit=300, offset=0):
         if isinstance(d.get("params"), str):
             try: d["params"] = json.loads(d["params"])
             except Exception: pass
+        try:
+            dec = qr_decode.decode_qr_full(d.get("raw"))
+            d["decoded"] = dec
+            if dec.get("host"): d["params"] = dec["params"]   # eski yozuvlarda '+' bo'shliqqa aylanib qolgan bo'lishi mumkin — xom matndan qayta o'qiladi
+        except Exception:
+            d["decoded"] = None
         out.append(d)
     return out, total
+
+
+# ---- 🗂 Doimiy darslar katalogi (lesson_catalog): jadval yangilanganda to'ldiriladi, hech qachon o'chirilmaydi ----
+async def upsert_lesson_catalog(email, rows):
+    """rows: hero_schedule.catalog_rows() natijasi [(lesson_key, {...})]. Mavjud yozuvda bo'sh maydonlar to'ldiriladi (mavjud qiymat o'chmaydi). -> yozilgan darslar soni"""
+    rows = list(rows or [])
+    if not rows or not email: return 0
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            await conn.executemany(
+                "INSERT INTO lesson_catalog (lesson_key, lesson_date, start_time, end_time, subject, stream_id, stream, event_type, teacher, room) "
+                "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) "
+                "ON CONFLICT (lesson_key) DO UPDATE SET "
+                "end_time = COALESCE(EXCLUDED.end_time, lesson_catalog.end_time), stream = COALESCE(EXCLUDED.stream, lesson_catalog.stream), "
+                "event_type = COALESCE(EXCLUDED.event_type, lesson_catalog.event_type), teacher = COALESCE(EXCLUDED.teacher, lesson_catalog.teacher), "
+                "room = COALESCE(EXCLUDED.room, lesson_catalog.room), updated_at = NOW()",
+                [(k, r["date"], r["start"], r.get("end"), r["subject"][:300], r.get("stream_id"), (r.get("stream") or None) and str(r["stream"])[:200],
+                  (r.get("event_type") or None) and str(r["event_type"])[:80], (r.get("teacher") or None) and str(r["teacher"])[:300],
+                  (r.get("room") or None) and str(r["room"])[:200]) for k, r in rows])
+            await conn.executemany("INSERT INTO lesson_catalog_emails (lesson_key, email) VALUES ($1, $2) ON CONFLICT DO NOTHING", [(k, email) for k, _ in rows])
+    return len(rows)
+
+async def lesson_catalog_count():
+    async with pool.acquire() as conn:
+        return await conn.fetchval("SELECT COUNT(*) FROM lesson_catalog") or 0
+
+async def get_lesson_catalog(limit=3000):
+    """Katalog darslari (yangisi birinchi) + har biri uchun emaillar ro'yxati."""
+    limit = max(1, min(10000, int(limit)))
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT c.lesson_key, c.lesson_date, c.start_time, c.end_time, c.subject, c.stream_id, c.stream, c.event_type, c.teacher, c.room, "
+            "COALESCE(array_agg(e.email ORDER BY e.email) FILTER (WHERE e.email IS NOT NULL), ARRAY[]::text[]) AS emails "
+            "FROM lesson_catalog c LEFT JOIN lesson_catalog_emails e ON e.lesson_key = c.lesson_key "
+            "GROUP BY c.lesson_key ORDER BY c.lesson_date DESC, c.start_time DESC, c.subject LIMIT $1", limit)
+    return [dict(r) for r in rows]

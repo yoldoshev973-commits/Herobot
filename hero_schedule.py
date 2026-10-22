@@ -70,6 +70,11 @@ START_KEYS = ("beginTime", "begin_time", "begin", "startTime", "start_time", "st
 END_KEYS = ("endTime", "end_time", "end", "endDate", "to", "timeEnd", "dateEnd")
 DATE_KEYS = ("date", "day", "lessonDate", "lesson_date")
 TIME_KEYS = ("time", "lessonTime", "timeRange", "time_range", "hours")
+SUBJECT_KEYS = ("subject", "subjectName", "subject_name")
+STREAM_ID_KEYS = ("stream_id", "streamId", "steam_id", "steamId")
+STREAM_KEYS = ("stream", "steam", "streamName", "stream_name", "steamName", "steam_name")
+EVENT_TYPE_KEYS = ("event_type", "eventType")
+_ID_KEYS = ("id", "_id", "stream_id", "streamId", "steam_id", "steamId", "uuid")
 NEST_KEYS = ("lessons", "schedule", "items", "list", "classes", "events", "pairs")
 LIST_KEYS = ("data", "items", "list", "schedule", "lessons", "result", "results", "rows", "content")
 
@@ -173,6 +178,66 @@ def _hm(s):
     return f"{int(m.group(1)):02d}:{m.group(2)}" if m else None
 
 
+def _idtext(v):
+    """Identifikator: matn yoki son (bool emas) -> matn."""
+    if v is None or isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return str(int(v)) if float(v).is_integer() else str(v)
+    if isinstance(v, str):
+        return v.strip() or None
+    return None
+
+
+def _walk(it, depth=2):
+    """Yozuvning o'zi, so'ng ichma-ich dict'lari (va dict ro'yxatlari) — `depth` darajagacha, kenglik bo'yicha."""
+    level = [it]
+    for _ in range(depth + 1):
+        nxt = []
+        for d in level:
+            if not isinstance(d, dict):
+                continue
+            yield d
+            for v in d.values():
+                if isinstance(v, dict):
+                    nxt.append(v)
+                elif isinstance(v, list):
+                    nxt.extend(x for x in v[:3] if isinstance(x, dict))
+        level = nxt
+
+
+def _deep(it, keys, conv=_text):
+    """`keys` dan birinchi topilgan qiymat: avval yuqori daraja, keyin ichma-ich dict'lar."""
+    for d in _walk(it):
+        for k in keys:
+            if k in d:
+                t = conv(d[k])
+                if t:
+                    return t
+    return None
+
+
+def _stream_info(it):
+    """-> (stream_id, stream_nomi). Kalitlar: stream_id/streamId/steam_id/steamId; stream/steam obyekt (id + name) yoki oddiy qiymat."""
+    sid = _deep(it, STREAM_ID_KEYS, _idtext)
+    name = None
+    for d in _walk(it):
+        for k in STREAM_KEYS:
+            v = d.get(k)
+            if v in (None, ""):
+                continue
+            if isinstance(v, dict):
+                sid = sid or next((x for x in (_idtext(v.get(i)) for i in _ID_KEYS) if x), None)
+                name = name or _text(v)
+            elif isinstance(v, (int, float)) and not isinstance(v, bool):
+                sid = sid or _idtext(v)
+            else:
+                name = name or _text(v)
+        if sid and name:
+            break
+    return sid, name
+
+
 def normalize_item(it):
     sd, ed = _to_dt(_first(it, START_KEYS)), _to_dt(_first(it, END_KEYS))
     date = start = end = None
@@ -194,13 +259,16 @@ def normalize_item(it):
         else:
             m = _DATE_RE.match(str(_first(it, DATE_KEYS) or ""))
             date = m.group(0) if m else None
+    stream_id, stream = _stream_info(it)
     return {"date": date, "start": start, "end": end,
             "title": _pick(it, TITLE_KEYS) or "Dars", "teacher": _pick(it, TEACHER_KEYS),
-            "room": _pick(it, ROOM_KEYS), "type": _pick(it, TYPE_KEYS)}
+            "room": _pick(it, ROOM_KEYS), "type": _pick(it, TYPE_KEYS),
+            "subject": _deep(it, SUBJECT_KEYS), "stream_id": stream_id, "stream": stream,
+            "event_type": _deep(it, EVENT_TYPE_KEYS)}
 
 
 def normalize(data):
-    """Xom javob -> [{'date','start','end','title','teacher','room','type'}], sana/vaqt bo'yicha tartiblangan."""
+    """Xom javob -> [{'date','start','end','title','teacher','room','type','subject','stream_id','stream','event_type'}], sana/vaqt bo'yicha tartiblangan."""
     out = [normalize_item(x) for x in extract_items(data)]
     out.sort(key=lambda x: (x["date"] or "9999-99-99", x["start"] or "99:99"))
     return out
@@ -211,6 +279,29 @@ def normalize(data):
 def lesson_key(l):
     """Bir xil dars = bir xil sana + boshlanish vaqti + nom (o'qituvchi/xona turli yozilgan bo'lishi mumkin)."""
     return (l.get("date"), l.get("start"), (l.get("title") or "").strip().lower())
+
+
+def catalog_key(l):
+    """Doimiy katalog kaliti: sana + boshlanish + fan + stream_id (fan — `subject`, bo'lmasa sarlavha)."""
+    subj = (l.get("subject") or l.get("title") or "").strip().lower()
+    return f"{l.get('date') or ''}|{l.get('start') or ''}|{subj}|{l.get('stream_id') or ''}"
+
+
+def catalog_rows(lessons):
+    """normalize() natijasi -> katalog yozuvlari [(kalit, dict)]; sanasi/boshlanishi yo'qlari tashlanadi, kalit bo'yicha takrorlanmaydi."""
+    out = {}
+    for l in lessons:
+        if not l.get("date") or not l.get("start"):
+            continue
+        k = catalog_key(l)
+        if k in out:
+            continue
+        out[k] = {"date": l["date"], "start": l["start"], "end": l.get("end"),
+                  "subject": (l.get("subject") or l.get("title") or "Dars").strip(),
+                  "stream_id": l.get("stream_id"), "stream": l.get("stream"),
+                  "event_type": l.get("event_type") or l.get("type"),
+                  "teacher": l.get("teacher"), "room": l.get("room")}
+    return list(out.items())
 
 
 def group_lessons(rows):

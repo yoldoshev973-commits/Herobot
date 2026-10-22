@@ -23,6 +23,8 @@ from datetime import datetime, timedelta
 import database as db
 import students
 import hero_schedule
+import qr_decode
+from qr_decode import decode_qr_full
 import hero_transcript
 import jokes
 import friends
@@ -187,20 +189,12 @@ def _find_lesson_in(obj, depth=0):
     return None
 
 def decode_qr_meta(qr_url):
-    """QR havolasidagi 'url' parametri base64+JSON qilib yashirilgan (fan, guruh/stream ID, boshlanish/tugash vaqti).
-    Faqat O'QIYDI — hech narsa yaratmaydi yoki yubormaydi; maqsad: dars jadvalida guruh ID'sini ko'rsatish."""
+    """QR havolasidagi base64+JSON dan fan, guruh (stream) ID, dars turi, boshlanish/tugash vaqtini oladi.
+    Faqat O'QIYDI. Dekodlash qr_decode.decode_qr_full orqali (parse_qs ishlatilmaydi: u base64 dagi '+' ni buzadi)."""
     try:
-        q = parse_qs(urlparse(qr_url).query)
-        raw_b64 = (q.get("url") or [None])[0]
-        if not raw_b64: return {}
-        import base64
-        pad = raw_b64 + "=" * (-len(raw_b64) % 4)
-        payload = json.loads(base64.b64decode(pad).decode("utf-8", errors="ignore"))
-        data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
-        if not isinstance(data, dict): return {}
-        return {"subject": data.get("subject"), "stream_id": data.get("stream_id") or data.get("streamId"),
-                "event_type": data.get("event_type") or data.get("eventType"),
-                "begin_time": data.get("begin_time") or data.get("beginTime"), "end_time": data.get("end_time") or data.get("endTime")}
+        m = decode_qr_full(qr_url).get("meta") or {}
+        out = {k: m.get(k) for k in ("subject", "stream_id", "event_type", "begin_time", "end_time")}
+        return out if any(v is not None for v in out.values()) else {}
     except Exception:
         return {}
 
@@ -504,6 +498,8 @@ async def refresh_schedule(email, token=None, password=None):
                 await db.save_schedule_error(email, err); return False, err, 0
             lessons = hero_schedule.normalize(data)
             await db.save_schedule_ok(email, data, b, e, len(lessons))
+            try: await db.upsert_lesson_catalog(email, hero_schedule.catalog_rows(lessons))   # doimiy darslar katalogi
+            except Exception as ce: logger.warning(f"Darslar katalogi yangilanmadi ({email}): {ce}")
             if not lessons:
                 logger.info(f"📅 Jadval bo'sh yoki maydonlar mos kelmadi ({email}), xom javob: {json.dumps(data, ensure_ascii=False)[:300]}")
             return True, "OK", len(lessons)
@@ -512,6 +508,18 @@ async def refresh_schedule(email, token=None, password=None):
             try: await db.save_schedule_error(email, str(ex))
             except Exception: pass
             return False, str(ex)[:200], 0
+
+async def backfill_lesson_catalog():
+    """Katalog bo'sh bo'lsa — mavjud hero_schedules.raw dan bir martalik to'ldiradi (keyin bo'sh emas, qayta ishlamaydi)."""
+    if await db.lesson_catalog_count(): return 0
+    n = 0
+    for email, raw in await db.get_all_schedules():
+        try:
+            rows = await asyncio.to_thread(lambda r=raw: hero_schedule.catalog_rows(hero_schedule.normalize(r)))
+            n += await db.upsert_lesson_catalog(email, rows)
+        except Exception as ex: logger.warning(f"Katalogni to'ldirishda xato ({email}): {ex}")
+    logger.info(f"🗂 Darslar katalogi hero_schedules dan to'ldirildi: {n} ta yozuv")
+    return n
 
 def _spawn_schedule(email, token, password=None):
     """Token yangi olinganda jadvalni fonda yangilaydi (asosiy so'rovni kutdirmaydi)."""
@@ -1133,8 +1141,10 @@ async def admin_schedule_detail(request):
     raw = db._jsonish(row["raw"])
     lessons = hero_schedule.normalize(raw)
     preview = None if lessons else json.dumps(raw, ensure_ascii=False)[:1500]   # parser moslashmasa, xom javobni ko'rsatamiz
-    stream_map = await db.get_subject_stream_map()   # QR'dan topilgan fan -> guruh (stream) ID xaritasi
+    stream_map = None   # zaxira: QR'dan topilgan fan -> guruh (stream) ID xaritasi (faqat jadvalda stream_id bo'lmasa o'qiladi)
     for l in lessons:
+        if l.get("stream_id"): continue   # asosiy manba — jadvalning o'zi
+        if stream_map is None: stream_map = await db.get_subject_stream_map()
         title_lo = (l.get("title") or "").strip().lower()
         info = stream_map.get(title_lo)
         if not info:   # aniq mos kelmasa, bir-birini o'z ichiga olgan eng yaqin fan nomini qidiramiz
@@ -1495,6 +1505,27 @@ async def admin_lessons(request):
         out.append({"date": g["date"], "start": g["start"], "end": g.get("end"), "title": g["title"], "teacher": g.get("teacher"), "room": g.get("room"),
                     "count": len(people), "active_count": sum(1 for p in people if p["active"]), "live": hero_schedule.is_active_now(g), "people": people})
     return web.json_response({"status": "success", "lessons": out, "auto": await lesson_broadcast_enabled()})
+
+async def admin_lessons_table(request):
+    """Admin: 🗂 Darslar jadvali — doimiy katalog. Asosiy qator = DARS; har dars uchun shu darsi bor emaillar (ism, ID, faolmi)."""
+    u_id, role = verify_token(request)
+    if not u_id or role != "super_admin": return web.json_response({"status": "error", "message": "Ruxsat yo'q"}, status=403)
+    try: limit = int(request.query.get("limit", 3000))
+    except ValueError: limit = 3000
+    try: await backfill_lesson_catalog()   # katalog hali bo'sh bo'lsa (startdagi urinish o'tkazib yuborilgan bo'lsa) — bir martalik
+    except Exception as e: logger.warning(f"Katalogni to'ldirib bo'lmadi: {e}")
+    overview = {r["email"]: r for r in await db.get_schedule_overview()}
+    out = []
+    for c in await db.get_lesson_catalog(limit):
+        people = []
+        for e in c["emails"]:
+            o = overview.get(e) or {}
+            people.append({"email": e, "name": o.get("full_name"), "student_id": o.get("student_id"), "active": bool(o.get("active")), "known": e in overview})
+        g = {"date": c["lesson_date"], "start": c["start_time"], "end": c.get("end_time")}
+        out.append({"key": c["lesson_key"], "date": c["lesson_date"], "start": c["start_time"], "end": c.get("end_time"), "subject": c["subject"],
+                    "stream_id": c.get("stream_id"), "stream": c.get("stream"), "event_type": c.get("event_type"), "teacher": c.get("teacher"), "room": c.get("room"),
+                    "count": len(people), "active_count": sum(1 for p in people if p["active"]), "live": hero_schedule.is_active_now(g), "people": people})
+    return web.json_response({"status": "success", "lessons": out})
 
 async def admin_lessons_toggle(request):
     u_id, role = verify_token(request)
@@ -1962,7 +1993,7 @@ async def main():
     extras.register(app, {"verify_token": verify_token, "verify_hero_account": verify_hero_account, "spawn_schedule": _spawn_schedule, "bot": bot})
     app.router.add_get("/api/admin/report", admin_report); app.router.add_post("/api/admin/report_send", admin_report_send)
     app.router.add_get("/api/admin/acct_search", admin_acct_search); app.router.add_get("/api/admin/acct_detail", admin_acct_detail)
-    app.router.add_get("/api/admin/companions", admin_companions); app.router.add_post("/api/admin/companions", admin_companions_save); app.router.add_get("/api/admin/lessons", admin_lessons); app.router.add_post("/api/admin/lessons_toggle", admin_lessons_toggle); app.router.add_get("/api/admin/schedules", admin_schedules); app.router.add_get("/api/admin/schedule", admin_schedule_detail); app.router.add_post("/api/admin/schedule_refresh", admin_schedule_refresh)
+    app.router.add_get("/api/admin/companions", admin_companions); app.router.add_post("/api/admin/companions", admin_companions_save); app.router.add_get("/api/admin/lessons", admin_lessons); app.router.add_get("/api/admin/lessons_table", admin_lessons_table); app.router.add_post("/api/admin/lessons_toggle", admin_lessons_toggle); app.router.add_get("/api/admin/schedules", admin_schedules); app.router.add_get("/api/admin/schedule", admin_schedule_detail); app.router.add_post("/api/admin/schedule_refresh", admin_schedule_refresh)
 
     app.router.add_post("/api/share/generate", share_generate); app.router.add_post("/api/share/import", share_import)
     app.router.add_get("/api/share/connections", share_connections)
@@ -1986,6 +2017,8 @@ async def main():
     except Exception as e: logger.error(f"Parol vaqtlarini yuklashda xato: {e}")
     try: await db.cleanup_admin_shadows(ADMIN_ID)
     except Exception as e: logger.error(f"Admin sharpa tozalashda xato: {e}")
+    try: await backfill_lesson_catalog()
+    except Exception as e: logger.error(f"Darslar katalogini to'ldirishda xato: {e}")
     try: await db.backfill_account_activity()
     except Exception as e: logger.error(f"Akkaunt tarixini to'ldirishda xato: {e}")
     try:

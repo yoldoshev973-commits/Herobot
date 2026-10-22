@@ -200,7 +200,7 @@ async def _my_lessons(uid):
     now_t = hero_schedule.datetime.now(hero_schedule.TZ).strftime("%H:%M")
     def _not_finished(g):   # bugungi, allaqachon tugagan darslarni taklif qilmaymiz
         return not (g.get("date") == today and g.get("end") and str(g["end"]) < now_t)
-    mine = [dict(g, key=k) for k, g in (await _groups()).items() if g["emails"] & emails and (g.get("date") or "") >= today and _not_finished(g)]
+    mine = [dict(g, key="|".join(str(x) for x in k)) for k, g in (await _groups()).items() if g["emails"] & emails and (g.get("date") or "") >= today and _not_finished(g)]
     mine.sort(key=lambda g: (g["date"], g["start"]))
     return mine[:10]
 

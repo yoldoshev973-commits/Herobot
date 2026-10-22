@@ -108,3 +108,27 @@ Deploy tartibi:
 ## fixed11 — QR'dagi boshlanish/tugash vaqti ham saqlanadi
 - `qr_captures` ga `qr_begin`, `qr_end` ustunlari qo'shildi (Unix vaqt, soniyada; agar QR millisoniyada bergan bo'lsa, o'zi soniyaga o'giradi).
 - «🔳 QR kodlar» tafsilotida endi: Fan (QR'dan), Guruh (stream) ID, Dars turi, Boshlanishi/Tugashi — hammasi Toshkent vaqtida ko'rsatiladi.
+
+## fixed12 — Darslar katalogi, QR dekodlash
+
+**Oldingi xato tuzatishlari (shu versiyada):** `friends.py` dars kaliti; `database.py` — NULL-trial, bcrypt, `lesson[:160]`, COALESCE; `backup.py`.
+
+**Baza (qo'lda hech narsa qilmang — hammasi `CREATE TABLE IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`, eski ma'lumotga tegilmaydi)**
+- Yangi doimiy jadvallar: `lesson_catalog` (kalit `sana|boshlanish|fan|stream_id`; sana, vaqt, fan, stream_id, stream, tur, o'qituvchi, xona) va `lesson_catalog_emails` (`lesson_key`, `email`). Yozuvlar hech qachon o'chirilmaydi (faqat admin akkauntni butunlay o'chirsa, uning emaili `lesson_catalog_emails` dan olib tashlanadi).
+- `refresh_schedule()` da `save_schedule_ok` dan keyin katalog to'ldiriladi. Katalog BO'SH bo'lsa, ishga tushishda (va «🗂 Darslar jadvali» ochilganda) mavjud `hero_schedules.raw` dan bir martalik to'ldiriladi; logda: «🗂 Darslar katalogi hero_schedules dan to'ldirildi: N ta yozuv».
+- Eslatma: kalit ichida stream_id bor. Agar Hero javobida stream kaliti topilmasa, u bo'sh qoladi (kalit `sana|vaqt|fan|`). Keyin kalit nomi aniqlansa, bir xil dars alohida (stream_id'li) qator bo'lib qo'shiladi — eski (stream_id'siz) qator o'chmaydi.
+
+**hero_schedule.py**
+- `normalize_item()` endi `subject`, `stream_id`, `stream`, `event_type` ni ham qaytaradi. Kalit variantlari: `subject/subjectName/subject_name`, `stream_id/streamId/steam_id/steamId`, `stream/steam` (obyekt bo'lsa id + name), `event_type/eventType`; ichma-ich dict'larda ham qidiriladi. Xom javob o'zgarmaydi — kalit nomi boshqacha bo'lib chiqsa, faqat shu fayldagi `*_KEYS` ro'yxatlarini to'g'rilash kifoya (katalog keyingi yangilanishda to'ladi).
+
+**Admin panel**
+- Yangi «🗂 Darslar jadvali»: asosiy qator — DARS (sana, vaqt, fan, stream ID, stream, dars turi, o'qituvchi, xona, nechta email). Qatorni bossangiz shu darsi bor emaillar (ism, student ID, email, faol/nofaol). Qidiruv, fan/tur/sana (dan–gacha) filtrlari, Bugun/Kelgusi/O'tgan tugmalari. Endpoint: `GET /api/admin/lessons_table` (faqat super_admin).
+- Eski «📚 Darslar» va «📅 Dars jadvali» ishlaydi. `admin_schedule_detail` da stream_id endi jadvalning o'zidan olinadi; QR xaritasi faqat jadvalda stream_id bo'lmagan darslar uchun zaxira.
+- «🔳 QR kodlar»: har QR uchun karta (Fan, Stream ID, Dars turi, Boshlanish/Tugash — Toshkent vaqti; qolgan maydonlar chip ko'rinishida; xom URL «To'liq matn» ichida). Tafsilot oynasi ham shunday (dekodlangan JSON, parametrlar, Hero javobi).
+
+**QR dekodlash (`qr_decode.py`, yangi)**
+- `decode_qr_full(url)`: host, yo'l, barcha query parametrlar; base64 (oddiy `+/`, urlsafe `-_`, padding bor/yo'q, %-kodlangan) parametrlar dekodlanadi, JSON maydonlarga bo'linadi, ichma-ich `data` (JSON yoki yana base64) ham ochiladi.
+- **Xato tuzatildi:** `parse_qs` base64 dagi `+` ni bo'shliqqa aylantirib, dekodlashni buzardi. Endi query qo'lda ajratiladi va `unquote` (unquote_plus emas) ishlatiladi. `decode_qr_meta()` va `database._qr_parts()` ham shu orqali ishlaydi.
+- `get_qr_captures()` natijasida yangi `decoded` maydoni bor; eski yozuvlardagi `params` (bo'shliqqa aylangan `+`) xom matndan qayta o'qiladi (bazaga yozilgan qiymatlar o'zgarmaydi).
+
+**Testlar:** `tests/test_basic.py` ga `decode_qr_full` (plus/`%2B`/urlsafe/padding'siz/ichma-ich data/axlat kirish), `decode_qr_meta`, `_qr_parts`, `normalize_item` (variantlar) va `catalog_rows` testlari qo'shildi. Ishga tushirish yuqoridagi buyruq bilan.

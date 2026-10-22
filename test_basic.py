@@ -162,3 +162,121 @@ def test_webhook_wrong_header_403():
 
 def test_webhook_correct_header_200():
     assert _webhook_status({"X-Telegram-Bot-Api-Secret-Token": main.WEBHOOK_HEADER_SECRET}) == 200
+
+
+# ---------------------------------------------------------------- decode_qr_full
+import base64
+import json
+import qr_decode
+
+_QR_PAYLOAD = {"data": {"subject": "Fizika ???>>> fan", "stream_id": 2737, "event_type": "lecture",
+                        "begin_time": 1760000000, "end_time": 1760005400}}
+
+
+def _b64(obj, urlsafe=False, pad=True):
+    raw = json.dumps(obj, ensure_ascii=False).encode()
+    t = (base64.urlsafe_b64encode(raw) if urlsafe else base64.b64encode(raw)).decode()
+    return t if pad else t.rstrip("=")
+
+
+def _check_meta(m):
+    assert m["subject"] == "Fizika ???>>> fan"
+    assert str(m["stream_id"]) == "2737"
+    assert m["event_type"] == "lecture"
+    assert m["begin_sec"] == 1760000000 and m["end_sec"] == 1760005400
+
+
+def test_decode_qr_full_base64_with_plus_unencoded():
+    b = _b64(_QR_PAYLOAD)
+    assert "+" in b or "/" in b   # parse_qs aynan shu belgida buzardi
+    d = qr_decode.decode_qr_full(f"https://api.hero.study/qr/scan?lang=en&url={b}")
+    assert d["host"] == "api.hero.study" and d["path"] == "/qr/scan"
+    assert d["params"]["lang"] == "en" and d["params"]["url"] == b   # '+' o'zgarmagan
+    _check_meta(d["meta"])
+    assert d["decoded"][0]["param"] == "url" and d["decoded"][0]["encoding"] == "base64"
+
+
+def test_decode_qr_full_percent_encoded_base64():
+    from urllib.parse import quote
+    d = qr_decode.decode_qr_full("https://api.hero.study/qr?url=" + quote(_b64(_QR_PAYLOAD), safe=""))
+    _check_meta(d["meta"])
+
+
+def test_decode_qr_full_urlsafe_and_no_padding():
+    for pad in (True, False):
+        d = qr_decode.decode_qr_full("https://api.hero.study/qr?url=" + _b64(_QR_PAYLOAD, urlsafe=True, pad=pad))
+        _check_meta(d["meta"])
+    d = qr_decode.decode_qr_full("https://api.hero.study/qr?url=" + _b64(_QR_PAYLOAD, pad=False))   # oddiy +/ , padding yo'q
+    _check_meta(d["meta"])
+
+
+def test_decode_qr_full_flat_payload_and_camel_keys():
+    flat = {"subject": "Algebra", "streamId": "55", "eventType": "lab", "beginTime": 1760000000000, "endTime": 1760005400000}
+    d = qr_decode.decode_qr_full("https://api.hero.study/qr?url=" + _b64(flat))
+    m = d["meta"]
+    assert (m["subject"], str(m["stream_id"]), m["event_type"]) == ("Algebra", "55", "lab")
+    assert m["begin_sec"] == 1760000000 and m["end_sec"] == 1760005400   # millisoniya -> soniya
+
+
+def test_decode_qr_full_nested_data_is_base64_string():
+    outer = {"code": "abc", "data": _b64({"subject": "Kimyo", "stream_id": 7})}
+    d = qr_decode.decode_qr_full("https://api.hero.study/qr?url=" + _b64(outer))
+    assert d["meta"]["subject"] == "Kimyo" and str(d["meta"]["stream_id"]) == "7"
+    assert d["fields"].get("code") == "abc"
+
+
+def test_decode_qr_full_plain_params_and_garbage():
+    d = qr_decode.decode_qr_full("https://x.hero.study/a/b?lang=en&token=Fizika&lang=uz")
+    assert d["params"]["token"] == "Fizika" and d["params"]["lang"] == ["en", "uz"]
+    assert d["decoded"] == [] and d["meta"]["subject"] is None
+    for bad in ("", None, "salom", "https://x.hero.study/?url=%%%", "https://x.hero.study/?url=@@@@####"):
+        r = qr_decode.decode_qr_full(bad)
+        assert r["decoded"] == [] and r["meta"]["stream_id"] is None
+
+
+def test_decode_qr_meta_keeps_plus():
+    b = _b64(_QR_PAYLOAD)
+    m = main.decode_qr_meta(f"https://api.hero.study/qr?url={b}")
+    assert m["subject"] == "Fizika ???>>> fan" and str(m["stream_id"]) == "2737" and m["event_type"] == "lecture"
+    assert main.decode_qr_meta("https://api.hero.study/qr") == {}
+
+
+def test_qr_parts_does_not_turn_plus_into_space():
+    b = _b64(_QR_PAYLOAD)
+    host, path, params = db._qr_parts(f"https://api.hero.study/qr?url={b}")
+    assert host == "api.hero.study" and params["url"] == [b]
+
+
+# ---------------------------------------------------------------- normalize_item: subject / stream / event_type
+def test_normalize_item_snake_case():
+    r = hero_schedule.normalize_item({"subject": "Fizika", "stream_id": 2737, "stream": "A-1", "event_type": "lecture",
+                                      "begin_time": 1760000000, "end_time": 1760005400})
+    assert (r["subject"], r["stream_id"], r["stream"], r["event_type"]) == ("Fizika", "2737", "A-1", "lecture")
+
+
+def test_normalize_item_camel_and_steam_typo():
+    r = hero_schedule.normalize_item({"subjectName": "Kimyo", "steamId": 91, "steam": "B-2", "eventType": "lab", "date": "2026-10-22", "time": "09:00-10:20"})
+    assert (r["subject"], r["stream_id"], r["stream"], r["event_type"]) == ("Kimyo", "91", "B-2", "lab")
+    assert r["date"] == "2026-10-22" and r["start"] == "09:00"
+
+
+def test_normalize_item_stream_object_and_nested():
+    r = hero_schedule.normalize_item({"title": "X", "stream": {"id": 12, "name": "Oqim 12"}, "event": {"eventType": "practice"},
+                                      "subject": {"id": 3, "name": "Biologiya"}})
+    assert r["stream_id"] == "12" and r["stream"] == "Oqim 12" and r["event_type"] == "practice" and r["subject"] == "Biologiya"
+    r = hero_schedule.normalize_item({"lesson": {"steam": {"steamId": "S-5", "name": "Guruh"}, "subject_name": "Tarix"}})
+    assert r["stream_id"] == "S-5" and r["stream"] == "Guruh" and r["subject"] == "Tarix"
+
+
+def test_normalize_item_missing_fields_are_none():
+    r = hero_schedule.normalize_item({"title": "Dars"})
+    assert r["stream_id"] is None and r["stream"] is None and r["event_type"] is None and r["subject"] is None
+
+
+def test_catalog_key_and_rows():
+    a = hero_schedule.normalize_item({"subject": "Fizika", "stream_id": 1, "event_type": "lecture", "date": "2026-10-22", "time": "09:00-10:20", "teacher": "T"})
+    b = hero_schedule.normalize_item({"subject": "Fizika", "stream_id": 2, "date": "2026-10-22", "time": "09:00-10:20"})
+    rows = hero_schedule.catalog_rows([a, a, b, {"title": "sanasiz"}])
+    assert len(rows) == 2   # stream_id farqi alohida dars; takror va sanasiz tashlab ketiladi
+    assert rows[0][0] == "2026-10-22|09:00|fizika|1"
+    assert rows[0][1]["teacher"] == "T" and rows[0][1]["event_type"] == "lecture" and rows[0][1]["end"] == "10:20"

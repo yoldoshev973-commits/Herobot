@@ -73,7 +73,7 @@ def summarize(data, now_utc=None):
     active_accs = sum(1 for a in accs if is_active_token(a.get("bearer_token")))
     return {
         "users": len(users),
-        "active_users": sum(1 for u in users if u.get("trial_ends_at") and u["trial_ends_at"] > now_utc),
+        "active_users": sum(1 for u in users if u.get("trial_ends_at") is None or u["trial_ends_at"] > now_utc),
         "unique_accounts": len(email_count),
         "account_records": len(accs),
         "duplicate_emails": sum(1 for n in email_count.values() if n > 1),
@@ -190,7 +190,7 @@ def build_xlsx(data, now_utc, now_local, stats):
         rows.append([
             i, owner_label(u), u.get("telegram_id"), u.get("login"),
             to_local(u.get("created_at")), to_local(te),
-            "Faol" if te and te > now_utc else "Muddati tugagan",
+            "Faol" if (te is None or te > now_utc) else "Muddati tugagan",
             accs_per_user.get(u["id"], 0), scans_per_user.get(u["id"], 0),
         ])
     write_table(ws, ["№", "Foydalanuvchi", "Telegram ID", "Login", "Ro'yxatdan o'tgan", "Obuna tugaydi",
